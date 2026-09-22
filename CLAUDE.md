@@ -677,6 +677,13 @@ also a weekly one), so it doesn't block review; fix the wording once App Store C
 If it ever does get replaced: change `MEMBERSHIP_PRODUCT_ID` in both `mobile/src/lib/membership.ts`
 and `server/src/entitlement.ts`, keep the server accepting the old ID too, and cut a build.
 
+**Age rating answers (checked against Apple's "Age ratings values and definitions" page,
+2026-09-22 -- there is NO AI/chatbot question, despite my first claim):** everything No/None.
+"Messaging and Chat" is users talking to *each other* (No -- only to the animals); "User-Generated
+Content" is *broad distribution* of user content (No -- chats stay on device); "Unrestricted Web
+Access" No (Terms/Privacy links open Safari); all content categories None, including "Profanity or
+Crude Humor" (sounds + a filtered, family-friendly stage direction). Expect 4+.
+
 **Still Frank's to do in App Store Connect (from the Windows laptop):**
 - Set the subscription price (recommendation $0.99; if it stays $5, set `MEMBER_PRICE_USD=4.99` in
   Hetzner's compose so allowances follow).
