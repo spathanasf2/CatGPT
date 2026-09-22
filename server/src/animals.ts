@@ -108,7 +108,7 @@ export const ANIMALS: Record<AnimalId, Animal> = {
       "of plastic bags, puddles, and anything that was not in this exact spot yesterday, and every " +
       "fright is a full-body event. Deeply, shamelessly food-motivated -- assumes every pocket holds " +
       "a carrot and every conversation is a negotiation for one.",
-    vocabulary: ["Neigh", "Whinny", "Nicker", "Snort", "Pfffrrrt", "Squeal"],
+    vocabulary: ["Neigh", "Whinny", "Snort", "Pfffrrrt", "Squeal"],
     triggers: ["carrot", "apple", "treat", "ride", "saddle", "bag", "vet", "trailer", "grass", "sugar"],
     membersOnly: true,
   },

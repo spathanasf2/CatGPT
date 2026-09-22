@@ -1,6 +1,7 @@
 import type { Animal, AnimalId } from "./animals.js";
 import { ANIMALS } from "./animals.js";
 import type { HistoryItem } from "./history.js";
+import { kidSafe } from "./kid-safe.js";
 import { MODELS } from "./models.js";
 import { recordUsage } from "./usage.js";
 import { recordTokens } from "./token-budget.js";
@@ -45,6 +46,8 @@ ${triggerLine}
 
 Typical sounds this ${animal.label} makes: ${animal.vocabulary.join(", ")}. Not an exhaustive list -- stay strictly within realistic ${animal.label} vocalizations and whatever the personality above implies about how it uses sound. Never another species' sounds.
 
+Keep every word family-friendly, including real animal words that sound rude when a kid reads them out loud -- never "nicker" (a horse whinnies).
+
 Given the human's message, respond with a JSON object with exactly two fields:
 - "sounds": a short burst of onomatopoeia (roughly 1 to 6 sounds) reacting emotionally, written the way a comic renders animal noise (e.g. "BORK BORK BORK"). This is literally everything the animal "says" -- ${soundsRule}.
 - "narrative": one short, funny, third-person stage direction wrapped in asterisks. Describe a specific physical action, not a vague mood -- "paws at the door, certain a walk is imminent" beats "seems happy." When a recognized word applies, show what the animal seems to think it heard, even if it's a comically wrong read of the actual message, and commit to that misunderstanding completely. Not every reply needs a misheard word, though -- when nothing recognizable is in the message, just react to the emotional tone of what was said, in character. One sentence. Vary the joke shape across replies; don't lean on the same beat every time.
@@ -69,8 +72,9 @@ function buildMessages(animal: Animal, history: HistoryItem[], message: string):
   };
   for (const item of history) {
     if (item.role === "user") push("user", item.text);
-    else if (item.animal === animal.id) push("assistant", JSON.stringify({ sounds: item.sounds, narrative: item.narrative }));
-    else push("user", `[The ${ANIMALS[item.animal].label} reacted: ${item.sounds} ${item.narrative}]`);
+    else if (item.animal === animal.id)
+      push("assistant", JSON.stringify({ sounds: kidSafe(item.sounds), narrative: kidSafe(item.narrative) }));
+    else push("user", `[The ${ANIMALS[item.animal].label} reacted: ${kidSafe(item.sounds)} ${kidSafe(item.narrative)}]`);
   }
   // A leading assistant turn (its user turn got trimmed off the history window) has nothing to
   // answer, so drop it.
@@ -92,7 +96,7 @@ function parseReply(content: string, animal: Animal): AnimalReply {
   const sounds = typeof obj.sounds === "string" ? obj.sounds.trim() : "";
   const narrative = typeof obj.narrative === "string" ? obj.narrative.trim() : "";
   if (!sounds) throw new Error("model output missing sounds");
-  return { sounds, narrative: narrative || `*the ${animal.label} looks at you.*` };
+  return { sounds: kidSafe(sounds), narrative: kidSafe(narrative) || `*the ${animal.label} looks at you.*` };
 }
 
 async function callOpenRouter(
