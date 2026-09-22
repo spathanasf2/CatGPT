@@ -648,6 +648,19 @@ All five "open decisions" from the review pass were settled with Frank and shipp
    dates -- percent, not tokens.
 5. **App points at production** (see "Production hosting").
 
+**Build 1.0 (11), same day: iPhone-only.** Capacitor's scaffold had `TARGETED_DEVICE_FAMILY =
+"1,2"` (iPhone + iPad), which makes App Store Connect demand 13" iPad screenshots and App Review
+test on iPad. Now `1`, matching qoracle -- the app still runs on iPads in iPhone compatibility mode.
+Only changeable freely because the app has never shipped; once live on iPad, support can't be
+dropped. No web changes, so the Mac's existing synced bundle was archived as-is.
+
+**App Store screenshots (6.5" slot, 1242x2688):** `~/deliverables/aineko/app-store-6.5/` on
+foundry (dog, room, cat, goat, sidebar). Generated, not device captures -- Frank's phone isn't a
+6.5" size -- by `mobile/scripts/app-store-screenshots/shots.mjs`: the real static export rendered
+in Playwright's WebKit **on the Mac** (so fonts and emoji are Apple's, not Linux substitutes),
+seeded with real unedited model replies (`convos.json`, best of two runs per chat). No iOS status
+bar. The goat shot shows the member view (no lock). Regenerate there after any UI change.
+
 **Still Frank's to do in App Store Connect (from the Windows laptop):**
 - Set the subscription price (recommendation $0.99; if it stays $5, set `MEMBER_PRICE_USD=4.99` in
   Hetzner's compose so allowances follow).

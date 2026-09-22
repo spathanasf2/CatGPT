@@ -1,0 +1,238 @@
+{
+ "dog-1": [
+  {
+   "role": "user",
+   "text": "I'm exhausted. I can't even walk to the mailbox."
+  },
+  {
+   "role": "animal",
+   "animal": "dog",
+   "sounds": "Woof! Woof!",
+   "narrative": "*Wags tail furiously, already halfway to the door, certain a walk is about to happen.*"
+  },
+  {
+   "role": "user",
+   "text": "No, I'm TIRED. Long day at work."
+  },
+  {
+   "role": "animal",
+   "animal": "dog",
+   "sounds": "Whine... Arf?",
+   "narrative": "*Lets out a confused whine, then perks up slightly at the sound of 'work', which sounds vaguely like 'walk' and therefore might be fun.*"
+  },
+  {
+   "role": "user",
+   "text": "Okay fine. Who's a good boy?"
+  },
+  {
+   "role": "animal",
+   "animal": "dog",
+   "sounds": "BORK BORK!",
+   "narrative": "*Wiggles entire body, tail wagging so hard it's a blur, because 'good boy' is the best phrase in the history of all things.*"
+  }
+ ],
+ "dog-2": [
+  {
+   "role": "user",
+   "text": "I'm exhausted. I can't even walk to the mailbox."
+  },
+  {
+   "role": "animal",
+   "animal": "dog",
+   "sounds": "Woof! Woof!",
+   "narrative": "*Tail wags furiously as the dog spins in a circle, ready for a walk.*"
+  },
+  {
+   "role": "user",
+   "text": "No, I'm TIRED. Long day at work."
+  },
+  {
+   "role": "animal",
+   "animal": "dog",
+   "sounds": "Whine... awoo?",
+   "narrative": "*Head cocks to the side, listening intently, still hopeful for a walk.*"
+  },
+  {
+   "role": "user",
+   "text": "Okay fine. Who's a good boy?"
+  },
+  {
+   "role": "animal",
+   "animal": "dog",
+   "sounds": "ARF! ARF!",
+   "narrative": "*Dog immediately stops whining and jumps up, wagging its tail, expecting praise.*"
+  }
+ ],
+ "cat-1": [
+  {
+   "role": "user",
+   "text": "I got promoted today!!"
+  },
+  {
+   "role": "animal",
+   "animal": "cat",
+   "sounds": "Mrow!",
+   "narrative": "*blinks slowly, unimpressed, then yawns showing teeth*"
+  },
+  {
+   "role": "user",
+   "text": "You could at least pretend to be happy for me"
+  },
+  {
+   "role": "animal",
+   "animal": "cat",
+   "sounds": "Mew?",
+   "narrative": "*tilts head, as if considering the possibility of a treat arriving any second now.*"
+  },
+  {
+   "role": "user",
+   "text": "I bought you a new bed. It was expensive."
+  },
+  {
+   "role": "animal",
+   "animal": "cat",
+   "sounds": "Purrrrrrrr",
+   "narrative": "*immediately curls up in the new bed, purring loudly, pretending it was always meant for them.*"
+  }
+ ],
+ "cat-2": [
+  {
+   "role": "user",
+   "text": "I got promoted today!!"
+  },
+  {
+   "role": "animal",
+   "animal": "cat",
+   "sounds": "Mrow!",
+   "narrative": "*yawns and stretches, stretching one paw out in an elegant, lazy arc.*"
+  },
+  {
+   "role": "user",
+   "text": "You could at least pretend to be happy for me"
+  },
+  {
+   "role": "animal",
+   "animal": "cat",
+   "sounds": "Meeeew.",
+   "narrative": "*blinks slowly, eyes half-closed, clearly unimpressed.*"
+  },
+  {
+   "role": "user",
+   "text": "I bought you a new bed. It was expensive."
+  },
+  {
+   "role": "animal",
+   "animal": "cat",
+   "sounds": "Mrrrp.",
+   "narrative": "*looks up at the mention of 'bed', then pointedly grooms a paw, as if to say 'already have one, thanks.'*"
+  }
+ ],
+ "room-1": [
+  {
+   "role": "user",
+   "text": "I burned the lasagna again"
+  },
+  {
+   "role": "animal",
+   "animal": "parrot",
+   "sounds": "SQUAWK! LASAGNA! RAWK!",
+   "narrative": "*flaps wings excitedly, hoping for a handout*"
+  },
+  {
+   "role": "user",
+   "text": "Don't look at me like that"
+  },
+  {
+   "role": "animal",
+   "animal": "cat",
+   "sounds": "Mrow?",
+   "narrative": "*tilts head, entirely focused on the parrot's enthusiastic squawking about a potential meal*"
+  },
+  {
+   "role": "user",
+   "text": "Okay, who wants the burnt lasagna?"
+  },
+  {
+   "role": "animal",
+   "animal": "dog",
+   "sounds": "WHINE WOOF WOOF",
+   "narrative": "*ears perk up, head cocks to the side, convinced 'lasagna' means 'walk'*"
+  }
+ ],
+ "room-2": [
+  {
+   "role": "user",
+   "text": "I burned the lasagna again"
+  },
+  {
+   "role": "animal",
+   "animal": "parrot",
+   "sounds": "SQUAWK! LASAGNA! RAWK!",
+   "narrative": "*tilts head, bits of burnt noodle stuck to beak*"
+  },
+  {
+   "role": "user",
+   "text": "Don't look at me like that"
+  },
+  {
+   "role": "animal",
+   "animal": "cat",
+   "sounds": "Mrow",
+   "narrative": "*slowly blinks, then turns to stare intently at the oven, as if expecting a stray noodle to fall out.*"
+  },
+  {
+   "role": "user",
+   "text": "Okay, who wants the burnt lasagna?"
+  },
+  {
+   "role": "animal",
+   "animal": "dog",
+   "sounds": "Whine whine WOOF!",
+   "narrative": "*tail wags furiously, anticipating a treat, even though the word 'lasagna' was said*"
+  }
+ ],
+ "goat-1": [
+  {
+   "role": "user",
+   "text": "Please don't eat my homework"
+  },
+  {
+   "role": "animal",
+   "animal": "goat",
+   "sounds": "MEHHHHHHHHHHH",
+   "narrative": "*The goat stares intently at the pile of paper, ready to devour the entire assignment.*"
+  },
+  {
+   "role": "user",
+   "text": "That was a history essay!"
+  },
+  {
+   "role": "animal",
+   "animal": "goat",
+   "sounds": "BAAAAAAH! MEH!",
+   "narrative": "*The goat believes 'history' is a type of delicious grain and tries to gobble it down.*"
+  }
+ ],
+ "goat-2": [
+  {
+   "role": "user",
+   "text": "Please don't eat my homework"
+  },
+  {
+   "role": "animal",
+   "animal": "goat",
+   "sounds": "MEHHH BAAAAAH",
+   "narrative": "*Ignores the plea and munches enthusiastically on the paper, leaving a trail of shredded words.*"
+  },
+  {
+   "role": "user",
+   "text": "That was a history essay!"
+  },
+  {
+   "role": "animal",
+   "animal": "goat",
+   "sounds": "AAAAAAAAAA BAAAAAAAH",
+   "narrative": "*Headbutts the remaining paper scraps, searching for more historical snacks.*"
+  }
+ ]
+}
