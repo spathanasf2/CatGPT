@@ -9,6 +9,10 @@ export type Animal = {
   // the human actually meant and what a trigger word makes the animal think it heard. Empty means
   // no fixed vocabulary; see the personality field for how it processes things instead.
   triggers: string[];
+  // The one exception to "no human words": a mimic's only words are fragments it parrots back from
+  // the human's own message. Without this flag the shared prompt forbids words outright, which
+  // contradicted the parrot's personality and made its mimicry hit-or-miss.
+  mimics?: true;
 };
 
 export const ANIMALS: Record<AnimalId, Animal> = {
@@ -80,6 +84,7 @@ export const ANIMALS: Record<AnimalId, Animal> = {
       "mistaken for conversation.",
     vocabulary: ["Squawk", "SQUAWK", "Awk", "Bawk", "Caw", "Rawk"],
     triggers: [],
+    mimics: true,
   },
   fish: {
     id: "fish",

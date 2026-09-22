@@ -1,5 +1,6 @@
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { writeFileAtomic } from "./atomic-write.js";
 import { log } from "./log.js";
 
 type WindowState = { tokens: number; resetAt: number };
@@ -29,19 +30,23 @@ let dirty = false;
 
 function persist(): void {
   try {
-    writeFileSync(FILE, JSON.stringify(records));
+    writeFileAtomic(FILE, JSON.stringify(records));
   } catch (err) {
     log.error("failed to persist token budget", { error: err instanceof Error ? err.message : String(err) });
   }
 }
 
+// Also called on shutdown (index.ts), so a redeploy doesn't drop up to a minute of spend.
+export function flushBudget(): void {
+  if (!dirty) return;
+  persist();
+  dirty = false;
+}
+
 // Periodic flush (not on every write -- this gets called on every chat reply) plus cleanup of
 // IPs that haven't been seen in over a month, so the file doesn't grow forever.
 setInterval(() => {
-  if (dirty) {
-    persist();
-    dirty = false;
-  }
+  flushBudget();
   const now = Date.now();
   for (const [ip, rec] of Object.entries(records)) {
     if (now > rec.month.resetAt) delete records[ip];

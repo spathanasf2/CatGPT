@@ -17,6 +17,7 @@ type Props = {
 export function MembershipModal({ onClose }: Props) {
   const [available] = useState(() => nativePurchasesAvailable());
   const [product, setProduct] = useState<MembershipProduct | null>(null);
+  const [productLoaded, setProductLoaded] = useState(false);
   const [member, setMember] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +26,8 @@ export function MembershipModal({ onClose }: Props) {
     if (!available) return;
     fetchMembershipProduct()
       .then(setProduct)
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setProductLoaded(true));
     isMember()
       .then(setMember)
       .catch(() => setMember(false));
@@ -73,7 +75,7 @@ export function MembershipModal({ onClose }: Props) {
         {available && member === false && (
           <>
             <p className="modal-row-label">Unlimited chats</p>
-            <p className="modal-row-value">{product ? `${product.priceString} / month` : "Loading..."}</p>
+            <p className="modal-row-value">{product ? `${product.priceString} / month` : productLoaded ? "Not available right now." : "Loading..."}</p>
             {error && <p className="modal-error">{error}</p>}
             <button className="subscribe-btn" onClick={handleSubscribe} disabled={busy || !product}>
               {busy ? "Processing..." : "Subscribe"}

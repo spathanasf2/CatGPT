@@ -114,16 +114,26 @@ select {
   padding: 10px 8px;
 }
 
+/* A row, not a button: select and delete are sibling buttons (a button nested in a button is
+   invalid and confuses VoiceOver). */
 .chat-item {
+  display: flex;
+  align-items: center;
+  border-radius: 10px;
+  color: #cfcdd6;
+  font-size: 13.5px;
+}
+
+.chat-item-main {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 9px 8px;
-  border-radius: 10px;
   border: none;
   background: transparent;
-  color: #cfcdd6;
-  font-size: 13.5px;
+  color: inherit;
   text-align: left;
 }
 
@@ -140,10 +150,13 @@ select {
 }
 
 .chat-item-delete {
+  border: none;
+  background: transparent;
   color: #6f6c78;
   font-size: 16px;
   line-height: 1;
-  padding: 0 4px;
+  /* Roomier than the glyph itself -- this used to be a ~24x16 tap target. */
+  padding: 10px 12px;
 }
 
 .settings-btn {
@@ -286,6 +299,18 @@ select {
   border: 1.5px solid #6b3038;
   color: #e3a5ab;
   border-bottom-left-radius: 4px;
+}
+
+.retry-btn {
+  display: block;
+  margin-top: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1.5px solid #6b3038;
+  background: transparent;
+  color: #e3a5ab;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .sounds {

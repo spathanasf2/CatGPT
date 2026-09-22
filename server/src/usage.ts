@@ -1,5 +1,6 @@
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { writeFileAtomic } from "./atomic-write.js";
 import { log } from "./log.js";
 
 export type Usage = {
@@ -35,7 +36,7 @@ export function recordUsage(promptTokens: number, completionTokens: number): voi
     requests: usage.requests + 1,
   };
   try {
-    writeFileSync(FILE, JSON.stringify(usage));
+    writeFileAtomic(FILE, JSON.stringify(usage));
   } catch (err) {
     log.error("failed to persist usage", { error: err instanceof Error ? err.message : String(err) });
   }

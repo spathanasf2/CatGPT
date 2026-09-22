@@ -3,8 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { ANIMALS, animalById, type AnimalId } from "@/lib/animals";
-import { askAnimal } from "@/lib/chat";
-import { loadChats, saveChats, newChat, titleFromFirstMessage, type Chat, type ChatMessage } from "@/lib/chats";
+import { askAnimal, toHistory, ChatError, type ChatErrorKind, type HistoryItem } from "@/lib/chat";
+import {
+  loadChats,
+  saveChats,
+  newChat,
+  moveToFront,
+  titleFromFirstMessage,
+  type Chat,
+  type ChatMessage,
+} from "@/lib/chats";
 import { useViewportHeight } from "@/lib/use-viewport-height";
 import { Sidebar } from "@/components/Sidebar";
 import { SettingsModal } from "@/components/SettingsModal";
@@ -24,18 +32,37 @@ const STARTER_PROMPTS: { label: string; message: string }[] = [
   { label: "tell them a secret", message: "Don't tell anyone, but..." },
 ];
 
-// The app should never land on a dead "pick a chat" screen. If the most recent chat is
-// still an untouched draft (zero user messages -- e.g. from a previous cold open nobody
-// typed into), reuse it instead of piling up empty chats in the sidebar; otherwise start
-// a fresh one. Chats are always prepended on creation, so a draft, if one exists, is
-// always at index 0.
+// The app should never land on a dead "pick a chat" screen. If there's still an untouched
+// draft (zero user messages -- e.g. from a previous cold open nobody typed into), reuse it
+// instead of piling up empty chats in the sidebar; otherwise start a fresh one. The draft isn't
+// necessarily first -- continuing an older chat moves that chat above it -- so it's searched for
+// and moved back to the top.
 function ensureDraft(list: Chat[]): { chats: Chat[]; activeId: string } {
-  const mostRecent = list[0];
-  if (mostRecent && !mostRecent.messages.some((m) => m.role === "user")) {
-    return { chats: list, activeId: mostRecent.id };
+  const draft = list.find((c) => !c.messages.some((m) => m.role === "user"));
+  if (draft) {
+    return { chats: moveToFront(list, draft.id), activeId: draft.id };
   }
   const chat = newChat(DEFAULT_ANIMAL);
   return { chats: [chat, ...list], activeId: chat.id };
+}
+
+// Phrased as a stage direction like every other animal line. The raw error is for the console,
+// not for the person chatting.
+function errorMessage(err: unknown, animal: AnimalId): ChatMessage {
+  console.warn("chat request failed", err);
+  const label = animalById(animal).label.toLowerCase();
+  const kind: ChatErrorKind = err instanceof ChatError ? err.kind : "unavailable";
+  const limit = err instanceof Error ? /(weekly|monthly) usage limit reached, resets (\S+)/.exec(err.message) : null;
+  const copy: Record<ChatErrorKind, string> = {
+    offline: `*the ${label} can't hear you.* Check your connection and try again.`,
+    timeout: `*the ${label} wandered off mid-thought.* Try again?`,
+    "rate-limited": `*the ${label} needs a breather.* You're sending messages faster than it can keep up -- give it a minute.`,
+    quota: limit
+      ? `*the ${label} is all talked out.* You've hit the ${limit[1]} chat limit -- it resets ${limit[2]}.`
+      : `*the ${label} is all talked out.* You've hit the chat limit for now.`,
+    unavailable: `*the ${label} didn't answer.* Something went wrong on our end -- try again in a bit.`,
+  };
+  return { id: crypto.randomUUID(), role: "error", text: copy[kind], animal, retryable: kind !== "quota" };
 }
 
 export default function Home() {
@@ -50,7 +77,10 @@ export default function Home() {
   const [showUsage, setShowUsage] = useState(false);
   const [showMembership, setShowMembership] = useState(false);
   const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
+  // Chats currently awaiting a reply, and which animal is doing the thinking. Per chat, so a
+  // pending reply in one chat doesn't show its thinking bubble in (or lock the composer of)
+  // whichever chat you switch to meanwhile.
+  const [pending, setPending] = useState<Record<string, AnimalId>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -75,10 +105,11 @@ export default function Home() {
   }, [chats, hydrated]);
 
   const activeChat = chats.find((c) => c.id === activeChatId) ?? null;
+  const activePending = activeChat ? pending[activeChat.id] : undefined;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [activeChat?.messages, sending]);
+  }, [activeChat?.messages, activePending]);
 
   // Best-effort only: iOS only shows the on-screen keyboard for a .focus() call made
   // *synchronously* inside a real user gesture (tap). This fires with no gesture behind it, so
@@ -148,34 +179,66 @@ export default function Home() {
     setChats((prev) => prev.map((c) => (c.id === chatId ? { ...c, messages: [...c.messages, message] } : c)));
   }
 
+  async function requestReply(chatId: string, animal: AnimalId, text: string, history: HistoryItem[]) {
+    setPending((prev) => ({ ...prev, [chatId]: animal }));
+    try {
+      const reply = await askAnimal(animal, text, history);
+      appendMessage(chatId, { id: crypto.randomUUID(), role: "animal", animal, ...reply });
+    } catch (err) {
+      appendMessage(chatId, errorMessage(err, animal));
+    } finally {
+      setPending((prev) => {
+        const next = { ...prev };
+        delete next[chatId];
+        return next;
+      });
+    }
+  }
+
   async function handleSend(overrideText?: string) {
     const text = (overrideText ?? input).trim();
-    if (!text || sending || !activeChat) return;
+    if (!text || !activeChat || pending[activeChat.id]) return;
     const chatId = activeChat.id;
     const animal = activeChat.animal;
     const isFirstUserMessage = !activeChat.messages.some((m) => m.role === "user");
+    const history = toHistory(activeChat.messages);
     setInput("");
     setChats((prev) =>
-      prev.map((c) =>
-        c.id === chatId
-          ? {
-              ...c,
-              title: isFirstUserMessage ? titleFromFirstMessage(text) : c.title,
-              messages: [...c.messages, { id: crypto.randomUUID(), role: "user", text }],
-            }
-          : c,
+      moveToFront(
+        prev.map((c) =>
+          c.id === chatId
+            ? {
+                ...c,
+                title: isFirstUserMessage ? titleFromFirstMessage(text) : c.title,
+                messages: [...c.messages, { id: crypto.randomUUID(), role: "user", text }],
+              }
+            : c,
+        ),
+        chatId,
       ),
     );
-    setSending(true);
-    try {
-      const reply = await askAnimal(animal, text);
-      appendMessage(chatId, { id: crypto.randomUUID(), role: "animal", animal, ...reply });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "something went wrong";
-      appendMessage(chatId, { id: crypto.randomUUID(), role: "error", text: msg });
-    } finally {
-      setSending(false);
-    }
+    await requestReply(chatId, animal, text, history);
+  }
+
+  // Re-asks the user message the error was answering, in place: the error bubble goes away and the
+  // reply lands where it would have originally. Only offered on a chat's last message, so a late
+  // reply can never land out of order.
+  function handleRetry(errorId: string) {
+    if (!activeChat || pending[activeChat.id]) return;
+    const messages = activeChat.messages;
+    const errorIndex = messages.findIndex((m) => m.id === errorId);
+    const error = messages[errorIndex];
+    // (Not findLastIndex -- that's iOS 15.4+, and the deployment target is 15.0.)
+    let userIndex = errorIndex - 1;
+    while (userIndex >= 0 && messages[userIndex]?.role !== "user") userIndex--;
+    const question = messages[userIndex];
+    if (error?.role !== "error" || question?.role !== "user") return;
+    const chatId = activeChat.id;
+    const animal = error.animal ?? activeChat.animal;
+    setChats((prev) =>
+      prev.map((c) => (c.id === chatId ? { ...c, messages: c.messages.filter((m) => m.id !== errorId) } : c)),
+    );
+    void requestReply(chatId, animal, question.text, toHistory(messages.slice(0, userIndex)));
   }
 
   const currentAnimal = activeChat ? animalById(activeChat.animal) : null;
@@ -219,7 +282,7 @@ export default function Home() {
         {activeChat ? (
           <>
             <div className="messages" ref={scrollRef}>
-              {activeChat.messages.map((m) => {
+              {activeChat.messages.map((m, i) => {
                 if (m.role === "user") {
                   return (
                     <div key={m.id} className="row user">
@@ -228,9 +291,21 @@ export default function Home() {
                   );
                 }
                 if (m.role === "error") {
+                  const canRetry = m.retryable !== false && !activePending && i === activeChat.messages.length - 1;
                   return (
                     <div key={m.id} className="row animal">
-                      <div className="bubble error">{m.text}</div>
+                      <div className="bubble error">
+                        {m.text}
+                        {canRetry && (
+                          <button
+                            className="retry-btn"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => handleRetry(m.id)}
+                          >
+                            Try again
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 }
@@ -246,12 +321,12 @@ export default function Home() {
                   </div>
                 );
               })}
-              {sending && currentAnimal && (
+              {activePending && (
                 <div className="row animal">
-                  <div className="bubble animal">
+                  <div className="bubble animal" style={{ ["--accent" as string]: animalById(activePending).accent }}>
                     <div className="thinking">
-                      <span>{currentAnimal.emoji}</span>
-                      <span>{currentAnimal.thinking}</span>
+                      <span>{animalById(activePending).emoji}</span>
+                      <span>{animalById(activePending).thinking}</span>
                       <span className="dots">
                         <span />
                         <span />
@@ -271,7 +346,7 @@ export default function Home() {
                     className="starter-chip"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => handleSend(p.message)}
-                    disabled={sending}
+                    disabled={!!activePending}
                   >
                     {p.label}
                   </button>
@@ -285,7 +360,9 @@ export default function Home() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSend();
+                  // Enter also confirms a Japanese/Chinese/Korean IME candidate -- that one must not
+                  // send. Safari reports it as keyCode 229 rather than via isComposing.
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) handleSend();
                 }}
                 placeholder={`say something to the ${currentAnimal?.label.toLowerCase()}...`}
                 enterKeyHint="send"
@@ -293,7 +370,7 @@ export default function Home() {
               <button
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleSend()}
-                disabled={sending || !input.trim()}
+                disabled={!!activePending || !input.trim()}
               >
                 Send
               </button>

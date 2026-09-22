@@ -39,25 +39,21 @@ export function Sidebar({
           {chats.map((c) => {
             const meta = animalById(c.animal);
             return (
-              <button
-                key={c.id}
-                className={`chat-item${c.id === activeChatId ? " active" : ""}`}
-                onClick={() => onSelectChat(c.id)}
-              >
-                <span className="chat-item-emoji">{meta.emoji}</span>
-                <span className="chat-item-title">{c.title}</span>
-                <span
+              <div key={c.id} className={`chat-item${c.id === activeChatId ? " active" : ""}`}>
+                <button className="chat-item-main" onClick={() => onSelectChat(c.id)}>
+                  <span className="chat-item-emoji">{meta.emoji}</span>
+                  <span className="chat-item-title">{c.title}</span>
+                </button>
+                <button
                   className="chat-item-delete"
-                  role="button"
-                  aria-label="Delete chat"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteChat(c.id);
+                  aria-label={`Delete chat: ${c.title}`}
+                  onClick={() => {
+                    if (window.confirm("Delete this chat? This can't be undone.")) onDeleteChat(c.id);
                   }}
                 >
                   &times;
-                </span>
-              </button>
+                </button>
+              </div>
             );
           })}
         </div>

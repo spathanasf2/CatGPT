@@ -3,7 +3,8 @@ import type { AnimalId } from "./animals";
 export type ChatMessage =
   | { id: string; role: "user"; text: string }
   | { id: string; role: "animal"; animal: AnimalId; sounds: string; narrative: string }
-  | { id: string; role: "error"; text: string };
+  // `animal` / `retryable` are absent on errors saved by builds 1.0 (1)-(9).
+  | { id: string; role: "error"; text: string; animal?: AnimalId; retryable?: boolean };
 
 export type Chat = {
   id: string;
@@ -63,4 +64,10 @@ export function newChat(animal: AnimalId): Chat {
 export function titleFromFirstMessage(text: string): string {
   const trimmed = text.trim();
   return trimmed.length > 40 ? `${trimmed.slice(0, 40)}...` : trimmed;
+}
+
+// Most recently used first, like every other chat app -- continuing an old chat moves it up.
+export function moveToFront(chats: Chat[], id: string): Chat[] {
+  const chat = chats.find((c) => c.id === id);
+  return chat ? [chat, ...chats.filter((c) => c.id !== id)] : chats;
 }
