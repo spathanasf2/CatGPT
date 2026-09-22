@@ -661,6 +661,20 @@ in Playwright's WebKit **on the Mac** (so fonts and emoji are Apple's, not Linux
 seeded with real unedited model replies (`convos.json`, best of two runs per chat). No iOS status
 bar. The goat shot shows the member view (no lock). Regenerate there after any UI change.
 
+**Build 1.0 (12), same day -- the submission candidate:** bonus animals grouped under a "Members
+only" `<optgroup>` in the picker (a section header in iOS's native picker) instead of a lock emoji
+per option (Frank: clear what's new, not "special"). Sandbox purchase verified working by Frank on
+TestFlight -- the real Apple-signed JWS path through `entitlement.ts` is now confirmed end to end.
+
+**Subscription description stuck in App Store Connect (2026-09-22):** editing it errored ("a
+problem occurred") for Frank. Advice given: don't delete and recreate -- a product ID, like a
+bundle ID, can never be reused, so replacing it burns `com.commandminelabs.aineko.monthly` forever
+and means redoing price/localizations/review screenshot plus a new build. The current text ("get a
+fresh token quota every month") is accurate (the monthly allowance does reset monthly; there's
+also a weekly one), so it doesn't block review; fix the wording once App Store Connect cooperates.
+If it ever does get replaced: change `MEMBERSHIP_PRODUCT_ID` in both `mobile/src/lib/membership.ts`
+and `server/src/entitlement.ts`, keep the server accepting the old ID too, and cut a build.
+
 **Still Frank's to do in App Store Connect (from the Windows laptop):**
 - Set the subscription price (recommendation $0.99; if it stays $5, set `MEMBER_PRICE_USD=4.99` in
   Hetzner's compose so allowances follow).
