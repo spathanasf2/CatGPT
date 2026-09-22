@@ -16,9 +16,9 @@ API key so it's never shipped in the client bundle.
 - `server/` — Express + TypeScript. Holds the OpenRouter key.
   `POST /chat {animal, message, history?, model?}` -> `{sounds, narrative}` (`history` = the last
   few user/animal turns, see "Conversation memory" below; `model` is an internal/ops override, never
-  sent by the app — see below); `GET /models` is the same kind of internal/testing surface. `GET
-  /usage` (app-wide token totals) **is** called by the app, from Settings > Usage -- which is a
-  problem for production, see "Open decisions" at the bottom. Animal roster + system prompt in `src/animals.ts` / `src/openrouter.ts`;
+  sent by the app — see below); `GET /models` and `GET /usage` (app-wide token totals) are the same kind of internal/ops surface
+  -- builds (1)-(9) showed `/usage` in Settings > Usage; build (10)+ calls `GET /usage/me` (the
+  caller's own allowance) instead. Animal roster + system prompt in `src/animals.ts` / `src/openrouter.ts`;
   the model list in `src/models.ts` doubles as the automatic-fallback order (see below); token
   counting in `src/usage.ts`.
 - `mobile/` — Next.js (App Router), `output: "export"` static site. ChatGPT/Claude-style shell:
@@ -185,17 +185,21 @@ requires a genuine screenshot of the purchase flow, and faking one would mean sh
 non-functional button that looks real. Mirrors qoracle's proven `@capgo/native-purchases` 7.19.3
 integration (same plugin, same version) rather than inventing a new pattern.
 - `mobile/src/lib/membership.ts`: wraps `getProducts`/`purchaseProduct`/`getPurchases`/
-  `restorePurchases` for the single product `com.commandminelabs.aineko.monthly`. `isMember()`
-  checks `purchases` for that product ID with `isActive && !revocationDate`.
+  `restorePurchases`/`manageSubscriptions` for the single product
+  `com.commandminelabs.aineko.monthly`. `refreshMembership()` finds that product in `purchases` with
+  `isActive === true && !revocationDate` and keeps its StoreKit 2 `jwsRepresentation`, which every
+  request sends as `X-Aineko-Membership` (see "Tiers and identity" below).
 - `mobile/src/components/MembershipModal.tsx`, reached via Settings -> Membership. Shows price
   (live from StoreKit via `getProducts`), a Subscribe button, and Restore purchases. On the tailnet
   browser build (no StoreKit there) it just says purchases aren't available there instead of
   crashing -- gated on `Capacitor.isNativePlatform()`.
-- **This does not gate chat access.** Subscribing doesn't unlock anything server-side (matches the
-  earlier decision to defer server-side entitlement enforcement) -- it's a real, working purchase
-  button, but "free tier limited / membership unlocks full usage" is still just copy on the landing
-  page, not enforced anywhere yet. Don't assume purchasing does anything beyond completing the
-  StoreKit transaction.
+- **What membership gets you (since build 1.0 (10), 2026-09-22):** the bonus animals (horse, goat,
+  snake -- `membersOnly` in both `animals.ts` files) and about 10x the free chat allowance. Both are
+  enforced server-side off a verified signed transaction, not just hidden in the app. (Builds
+  (3)-(9) had a working purchase button that unlocked nothing, labeled "Unlimited chats" -- a copy
+  mistake nobody meant, and an App Review 3.1.2(a) risk.) The modal shows the subscription's
+  title, length and price, renewal terms, Manage subscription for members, and the Terms of Use
+  (Apple's standard EULA) + Privacy Policy links Apple requires for auto-renewables.
 - Shipped in **build 1.0 (3)**, uploaded 2026-09-21. Needs pod install on the Mac (new native
   plugin) -- already done as part of this upload, but if resyncing from scratch, `npx cap sync ios`
   on the Mac (not just locally) is required before archiving.
@@ -261,10 +265,14 @@ Mirrors qoracle's exact pattern:
 - App Store Connect fields, now valid: Support URL `https://aineko.bromsg.com/`, Privacy URL
   `https://aineko.bromsg.com/privacy`, contact `aineko@bromsg.com`. Marketing URL left blank,
   matching qoracle.
-- The currently-uploaded TestFlight build still points at the **foundry tailnet URL**
-  (`NEXT_PUBLIC_AINEKO_SERVER_URL` in `mobile/.env.local`), not this production server. Switching
-  the app to call `https://aineko.bromsg.com` instead is a deliberate separate decision (needs a
-  new build either way) -- don't assume it happened just because the server exists now.
+- **Build 1.0 (10)+ talks to this production server** (Frank's call, 2026-09-22). The Mac's
+  `~/aineko/mobile/.env.local` holds the production URL + Hetzner's `AINEKO_AUTH_TOKEN`; the
+  tailnet values it used to hold are saved at `~/aineko-build/env.local.tailnet-before-1.0-10` on
+  the Mac. foundry's own `mobile/.env.local` deliberately stays on the tailnet server, so the
+  `aineko-demo` browser build keeps hitting the dev instance. **When syncing source to the Mac,
+  exclude `.env.local`** or the next TestFlight build silently goes back to the tailnet. Server
+  changes now need the Hetzner redeploy (rsync + `docker compose build/up aineko`) to reach
+  TestFlight users, not just a foundry restart.
 
 ## Abuse / liability posture
 - **Rate limiting** (`server/src/rate-limit.ts`, added 2026-09-21): 20 req/min/IP on `POST /chat`
@@ -298,29 +306,33 @@ Mirrors qoracle's exact pattern:
   support when the entity exists rather than assume.
 - **Acceptable Use policy** (`/terms`, see above) is the other half of this -- cheap, standard,
   already live.
-- **Per-IP token budget** (`server/src/token-budget.ts`, added 2026-09-21): the piece the
-  per-minute rate limit couldn't provide -- that one caps burst speed but not total damage over
-  time (a script sitting at exactly 20 req/min all month never trips it while running up ~$70 in
-  API cost against $0.99 of revenue). This caps *that*. Weekly + monthly rolling-ish (fixed-window,
-  same simplification as the per-minute limiter) token ceilings per IP, checked before each
-  `/chat` call via `checkBudget()`, incremented after via `recordTokens()` from
-  `openrouter.ts` at the exact point actual usage is known (same call site as the global
-  `recordUsage()`). `askAnimal()`'s signature changed to take `clientIp` as a required
-  parameter for this reason.
-  - **Numbers, derived from real measured usage, not guessed:** this app's actual average was ~395
-    prompt / ~44 completion tokens per request (measured from live traffic, before conversation
-    memory). With the full 8-turn history window a request measures ~780 prompt tokens (2026-09-22)
-    -- more tokens per message, but input-heavy, so the blended rate drops to ~$0.12/M and the
-    token-denominated caps below still bound worst-case cost (now ~$0.58/month); what shrinks is
-    messages-per-cap, to roughly 5-6k/month. At
-    `google/gemini-2.5-flash-lite`'s real pricing ($0.10/$0.40 per M), that's a blended
-    ~$0.13/M tokens for *this app's specific usage shape* -- don't reuse that blended rate for a
-    different model or a system prompt of very different length, recompute it.
-  - Break-even monthly tokens at the $0.99 price point: ~7.6M. Shipped defaults
-    (`MONTHLY_TOKEN_LIMIT=5000000`, `WEEKLY_TOKEN_LIMIT=1250000`, both env-overridable) keep
-    every subscriber's worst-case monthly cost near $0.65 against $0.99 revenue -- a bounded,
-    chosen loss instead of an unbounded one. ~11,000 messages/month at that ceiling; nobody
-    chatting with a cat for fun approaches it, so this only ever bites an actual abuse pattern.
+- **Token budgets** (`server/src/token-budget.ts`, added 2026-09-21 per-IP; per-caller tiers since
+  2026-09-22): the piece the per-minute rate limit couldn't provide -- that one caps burst speed but
+  not total damage over time (a script sitting at exactly 20 req/min all month never trips it
+  while running up ~$70 in API cost). Weekly + monthly fixed-window token ceilings, checked before
+  each `/chat` via `checkBudget()`, incremented via `recordTokens()` from `openrouter.ts` at the
+  exact point actual usage is known (same call site as the global `recordUsage()`).
+  - **Tiers and identity** (`resolveCaller()` in `index.ts`): a request with a valid
+    `X-Aineko-Membership` (StoreKit 2 JWS, verified offline in `src/entitlement.ts` against a
+    pinned Apple Root CA - G3 plus Apple's leaf/intermediate marker OIDs -- no dependency, covered
+    by `npm test`) is metered as `member:<originalTransactionId>`, which follows the person across
+    networks and reinstalls. Otherwise `install:<X-Aineko-Install>` (a random ID the app mints on
+    first launch, `mobile/src/lib/ids.ts`) at free limits, **plus** `ip:<addr>` at 2x member limits
+    as a backstop so minting fresh install IDs doesn't mint fresh allowances. No install header
+    (builds (1)-(9)) = `ip:<addr>` at free limits. Bonus animals return 403 `members-only` for
+    non-members. Not covered: a refund after the app last fetched its transaction stays honored
+    until that JWS's expiry (at most one billing period); App Store Server Notifications would
+    close it if it ever matters.
+  - **Numbers -- Frank's rule (2026-09-22): charge X, allow X/2 of API spend a month and X/8 a
+    week.** `src/limits.ts` derives every cap from `MEMBER_PRICE_USD` (Hetzner compose sets
+    `0.99`) and `COST_PER_MTOK_USD` (0.12, measured: ~780 prompt / ~45 completion tokens per message
+    with the full history window, at gemini-2.5-flash-lite's $0.10/$0.40 per M; fallback models
+    cost the same or less). At $0.99: members ~4.1M tokens/month, ~1.03M/week (~5,000 / ~1,250
+    messages); free = `FREE_FRACTION` 0.1 of that (~500/month, ~125/week). "About 10x" in the app's
+    copy mirrors `FREE_FRACTION` -- change both together. Realistic heavy use (100 messages/day
+    every day) is ~3,000/month, ~$0.30, so the member cap only ever bites scripts. Apple's cut
+    isn't in the rule: at $0.99 a member maxing the cap still nets $0.19 (30%) / $0.34 (15% small
+    business). Recompute `COST_PER_MTOK_USD` if the model or prompt length changes much.
   - Persisted like `usage.json` (`TOKEN_BUDGET_FILE` env var, points at the mounted volume on
     Hetzner) so quotas survive restarts/redeploys instead of giving every IP a free reset. Flushes
     to disk on a 60s interval, not on every request, plus on SIGTERM/SIGINT once in-flight replies
@@ -332,8 +344,12 @@ Mirrors qoracle's exact pattern:
     `USER node` container needs the same.
 
 ## Monetization
-Subscription model (unlike qoracle's one-consumable-plus-nonconsumables), priced deliberately low
--- $0.99/month, meant to roughly cover OpenRouter API cost rather than turn a profit. May run
+Subscription model (unlike qoracle's one-consumable-plus-nonconsumables), priced deliberately low,
+meant to roughly cover OpenRouter API cost rather than turn a profit. **Price as of 2026-09-22:
+App Store Connect has it at $5/month (Frank set it there); the recommendation from the usage math
+(see "Token budgets" above) is $0.99, which is what the server's `MEMBER_PRICE_USD` assumes.**
+Whichever it ends up being, keep `MEMBER_PRICE_USD` in Hetzner's compose in sync -- it sizes every
+allowance. May run
 negative; that's an accepted, explicit risk, not an oversight. Two independent fallbacks if the
 economics don't work: kill the app
 entirely, or paywall the `/chat` feature itself (server-side) while the free app stays installed.
@@ -573,7 +589,7 @@ Typechecked and built clean both locally and on the Mac. Shipped as build 1.0 (9
 established recipe (bump `CURRENT_PROJECT_VERSION` 8 -> 9, sync, rebuild, `cap sync ios`,
 unsigned archive, export with `destination: upload`).
 
-## Conversation memory + hardening pass (2026-09-22) -- server live, mobile waiting on build 1.0 (10)
+## Conversation memory + hardening pass (2026-09-22) -- server live, mobile shipped in build 1.0 (10)
 From a full review. **The repo had zero commits until this pass** -- nine TestFlight builds and a
 production deploy with no history. Baseline committed as-is (`ffb772b`, "as of build 1.0 (9)"),
 changes on top. Commit before every upload/deploy from now on, so any build can be traced back to
@@ -600,7 +616,7 @@ whole chain (under old builds' 20s client timeout), new client timeout 25s, and 
 is aborted when the client disconnects. Graceful SIGTERM shutdown (Docker previously SIGKILLed after
 10s since node-as-PID-1 ignored SIGTERM).
 
-**Mobile** (in the tailnet demo now; needs build 1.0 (10) to reach TestFlight): in-character error
+**Mobile** (build 1.0 (10)): in-character error
 bubbles with a "Try again" button that re-asks in place (instead of raw "Load failed" / "The
 operation was aborted."); pending/thinking state is per chat (it used to show in, and lock, whichever
 chat you switched to); Enter doesn't send while an IME candidate is being confirmed; continuing a
@@ -612,15 +628,30 @@ build 1) needs iOS 15.4 while the deployment target is 15.0 -- harmless in pract
 the target to 15.4 or add a fallback if it ever matters.
 
 
-## Open decisions (as of 2026-09-22) -- block App Store submission, not TestFlight
-1. **Membership screen needs Terms of Use (EULA) + Privacy Policy links** -- Apple requires both
-   in-app for auto-renewable subscriptions (guideline 3.1.2); a very common rejection.
-2. **"Unlimited chats" copy is false** -- membership unlocks nothing and subscribers hit the same
-   per-IP caps. Either gate something or reword (3.1.2(a) "ongoing value" risk).
-3. **Third-party AI consent** -- guideline 5.1.2(i) (Nov 2025) wants explicit permission before
-   user data goes to a third-party AI; messages go to OpenRouter.
-4. **Settings > Usage shows app-wide totals** (`GET /usage`) to every user against the 100k
-   placeholder -- exposes business numbers and will read "100% used" to everyone in production.
-5. **App still points at the tailnet URL** -- App Review can't reach it; switching to
-   `https://aineko.bromsg.com` needs a build. Production is now actually ready for it (per-IP
-   limits and persistence fixed 2026-09-22).
+## App Review prep, resolved 2026-09-22 (build 1.0 (10))
+All five "open decisions" from the review pass were settled with Frank and shipped in build (10):
+1. **Terms + Privacy links** in the Membership modal (Terms of Use = Apple's standard EULA).
+2. **Membership copy** is now true -- bonus animals + ~10x allowance, enforced server-side (see "In-app
+   purchase / membership" and "Token budgets").
+3. **Third-party AI consent**: `ConsentModal` asks on first launch as the boot screen clears ("Sounds
+   good" / "Not now"); a send without permission re-asks and then sends the queued message;
+   Settings > AI & privacy reviews/revokes it (`lib/consent.ts`, key `aineko.aiConsent.v1`).
+   Revoking stops sends; chats stay on device.
+4. **Settings > Usage** is per-user (`GET /usage/me`): plan, week/month percent bars with reset
+   dates -- percent, not tokens.
+5. **App points at production** (see "Production hosting").
+
+**Still Frank's to do in App Store Connect (from the Windows laptop):**
+- Set the subscription price (recommendation $0.99; if it stays $5, set `MEMBER_PRICE_USD=4.99` in
+  Hetzner's compose so allowances follow).
+- Check the subscription's display name/description there doesn't still say "Unlimited chats".
+- Keep the License Agreement on Apple's standard EULA, and put the Terms of Use + Privacy links in
+  the app description (Apple wants them in metadata too, not just in-app).
+- App Privacy answers now need: Identifiers (the random install ID) and Purchases (subscription
+  status), both "App Functionality", not linked to identity, not used for tracking; plus User
+  Content (messages sent to the AI provider to generate replies).
+- Enroll in the App Store Small Business Program if not already (15% instead of 30%).
+- On a TestFlight device: buy the membership with a Sandbox account and confirm the horse unlocks
+  -- the **one path not yet verified end to end** is a real Apple-signed JWS through
+  `entitlement.ts` (the test suite covers the mechanics with a look-alike chain). If the horse
+  stays locked after a sandbox purchase, check `docker logs aineko` and the header size first.

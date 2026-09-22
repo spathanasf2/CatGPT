@@ -63,8 +63,8 @@ and chatroom work below yet.
 2. **Sound + motion, not just text.** It's literally onomatopoeia -- a short bark/meow audio clip
    and a CSS bounce/shake on the bubble when a reply lands would multiply the payoff for near-zero
    engineering cost. Capacitor Haptics is already a proven dependency from qoracle.
-3. **More animals** -- partially done in v0.1.2 (parrot, fish; six total now). Still open: horse,
-   snake, goat. Slots into the v0.3 config-as-data work below directly -- a new animal becomes a
+3. **More animals** -- partially done in v0.1.2 (parrot, fish; six total now). Horse, goat, and
+   snake shipped 2026-09-22 as members-only bonus animals (build 1.0 (10)). Slots into the v0.3 config-as-data work below directly -- a new animal becomes a
    new JSON file, not a code change.
 
 ## v0.3 candidate: config as data, not code
