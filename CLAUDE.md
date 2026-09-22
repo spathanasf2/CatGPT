@@ -672,6 +672,8 @@ bundle ID, can never be reused, so replacing it burns `com.commandminelabs.ainek
 and means redoing price/localizations/review screenshot plus a new build. The current text ("get a
 fresh token quota every month") is accurate (the monthly allowance does reset monthly; there's
 also a weekly one), so it doesn't block review; fix the wording once App Store Connect cooperates.
+**Resolved same day: a fresh browser window fixed the edit** -- if App Store Connect throws a vague
+"a problem occurred" on a form again, try that before anything drastic.
 If it ever does get replaced: change `MEMBERSHIP_PRODUCT_ID` in both `mobile/src/lib/membership.ts`
 and `server/src/entitlement.ts`, keep the server accepting the old ID too, and cut a build.
 
