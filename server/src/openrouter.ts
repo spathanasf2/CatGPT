@@ -99,7 +99,7 @@ async function callOpenRouter(
   model: string,
   animal: Animal,
   messages: ChatTurn[],
-  clientIp: string,
+  budgetKeys: string[],
   signal: AbortSignal,
 ): Promise<AnimalReply> {
   const apiKey = process.env.OPENROUTER_API_KEY!;
@@ -139,7 +139,7 @@ async function callOpenRouter(
     const prompt = data.usage.prompt_tokens ?? 0;
     const completion = data.usage.completion_tokens ?? 0;
     recordUsage(prompt, completion);
-    recordTokens(clientIp, prompt + completion);
+    recordTokens(budgetKeys, prompt + completion);
   }
 
   const content = data.choices?.[0]?.message?.content;
@@ -149,6 +149,8 @@ async function callOpenRouter(
 }
 
 export type AskOptions = {
+  // Every budget this request counts against (see resolveCaller in index.ts).
+  budgetKeys: string[];
   history?: HistoryItem[];
   modelOverride?: string;
   // Aborted when the caller disconnects, so nobody pays for fallback replies no one will read.
@@ -158,8 +160,7 @@ export type AskOptions = {
 export async function askAnimal(
   animalId: AnimalId,
   message: string,
-  clientIp: string,
-  { history = [], modelOverride, signal }: AskOptions = {},
+  { budgetKeys, history = [], modelOverride, signal }: AskOptions,
 ): Promise<AnimalReply> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured");
@@ -175,7 +176,7 @@ export async function askAnimal(
   for (const model of candidates) {
     if (stop.aborted) break;
     try {
-      return await callOpenRouter(model, animal, messages, clientIp, stop);
+      return await callOpenRouter(model, animal, messages, budgetKeys, stop);
     } catch (err) {
       lastError = err;
       log.warn("model failed, trying next fallback", {

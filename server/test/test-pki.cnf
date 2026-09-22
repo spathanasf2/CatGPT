@@ -1,0 +1,19 @@
+# Throwaway PKI for test/entitlement.test.mts -- shaped like Apple's StoreKit signing chain.
+[req]
+distinguished_name=dn
+[dn]
+
+[ca_ext]
+basicConstraints=critical,CA:TRUE
+keyUsage=critical,keyCertSign,cRLSign
+[int_ext]
+basicConstraints=critical,CA:TRUE,pathlen:0
+keyUsage=critical,keyCertSign,cRLSign
+1.2.840.113635.100.6.2.1=ASN1:NULL
+[leaf_ext]
+basicConstraints=critical,CA:FALSE
+keyUsage=critical,digitalSignature
+1.2.840.113635.100.6.11.1=ASN1:NULL
+[devleaf_ext]
+basicConstraints=critical,CA:FALSE
+keyUsage=critical,digitalSignature

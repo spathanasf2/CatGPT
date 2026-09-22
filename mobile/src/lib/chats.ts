@@ -1,10 +1,19 @@
 import type { AnimalId } from "./animals";
+import { newId } from "./ids";
 
 export type ChatMessage =
   | { id: string; role: "user"; text: string }
   | { id: string; role: "animal"; animal: AnimalId; sounds: string; narrative: string }
-  // `animal` / `retryable` are absent on errors saved by builds 1.0 (1)-(9).
-  | { id: string; role: "error"; text: string; animal?: AnimalId; retryable?: boolean };
+  // `animal` / `retryable` / `action` are absent on errors saved by builds 1.0 (1)-(9).
+  | {
+      id: string;
+      role: "error";
+      text: string;
+      animal?: AnimalId;
+      retryable?: boolean;
+      // Offer a way out of the error besides retrying (quota / members-only -> Membership).
+      action?: "membership";
+    };
 
 export type Chat = {
   id: string;
@@ -53,7 +62,7 @@ export function saveChats(chats: Chat[]): void {
 
 export function newChat(animal: AnimalId): Chat {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     animal,
     title: "New chat",
     messages: [],

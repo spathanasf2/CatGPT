@@ -520,6 +520,55 @@ select {
   margin-bottom: 10px;
 }
 
+/* Prose inside a modal -- unlike .modal-row-value, which breaks anywhere (it was built for tokens). */
+.modal-text {
+  font-size: 14px;
+  line-height: 1.45;
+  color: #cfcdd6;
+  margin: 0 0 12px;
+}
+
+.consent-status {
+  color: #a29fac;
+  font-size: 13px;
+}
+
+.perk-list {
+  margin: 0 0 16px;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #f2f0f5;
+}
+
+.fine-print {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: #6f6c78;
+  margin: 2px 0 10px;
+}
+
+.modal-links {
+  font-size: 12.5px;
+  margin: 0 0 14px;
+}
+
+.modal-links a {
+  color: #a29fac;
+}
+
+.error-action-btn {
+  display: block;
+  margin-top: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1.5px solid var(--accent, #c98bd8);
+  background: transparent;
+  color: #f2f0f5;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .modal-close-btn {
   width: 100%;
   padding: 11px;

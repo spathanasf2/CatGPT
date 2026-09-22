@@ -8,7 +8,9 @@ import { MODELS, isAllowedModel } from "./models.js";
 import { getUsage } from "./usage.js";
 import { landingHtml, privacyHtml, termsHtml } from "./pages.js";
 import { rateLimit } from "./rate-limit.js";
-import { checkBudget, flushBudget } from "./token-budget.js";
+import { checkBudget, flushBudget, peekBudget } from "./token-budget.js";
+import { verifyMembershipCached } from "./entitlement.js";
+import { FREE_LIMITS, IP_BACKSTOP_LIMITS, LIMITS_SUMMARY, MEMBER_LIMITS, type Limits, type Tier } from "./limits.js";
 
 function envStr(name: string): string {
   const v = process.env[name];
@@ -30,12 +32,6 @@ envStr("OPENROUTER_API_KEY"); // fail fast at boot, not on first request
 // Placeholder starting allowance so the usage page has something to compare against --
 // real budgets/pricing get decided later, this just proves the counting is accurate.
 const USAGE_TOKEN_BUDGET = envInt("USAGE_TOKEN_BUDGET", 100_000);
-// Per-IP cost ceiling, sized off real measured usage (~439 tokens/request) against the $0.99/mo
-// price and gemini-2.5-flash-lite's actual per-token cost: break-even is ~7.6M tokens/month, this
-// keeps every subscriber's worst-case cost near $0.65 against $0.99 revenue -- a bounded, chosen
-// loss instead of an unbounded one. Weekly is monthly/4, same ratio as the plan it was derived from.
-const MONTHLY_TOKEN_LIMIT = envInt("MONTHLY_TOKEN_LIMIT", 5_000_000);
-const WEEKLY_TOKEN_LIMIT = envInt("WEEKLY_TOKEN_LIMIT", 1_250_000);
 // How many reverse proxies sit in front of this process. foundry: 1 (Tailscale Serve). Hetzner: 2
 // (Cloudflare -> Caddy, with Caddy set to trust Cloudflare's forwarded-for). Must match reality:
 // too low and every user is bucketed under a proxy's IP; `true` (trust everything) takes the
@@ -51,7 +47,7 @@ app.use(express.json({ limit: "32kb" }));
 app.use((_req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Aineko-Install, X-Aineko-Membership");
   res.setHeader("Access-Control-Max-Age", "86400");
   next();
 });
@@ -75,12 +71,52 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, animals: Object.keys(ANIMALS) });
 });
 
+// Who a request is metered as. Members: their verified subscription (follows them across networks
+// and reinstalls). Free: the random install ID the app generates, plus a generous per-IP backstop
+// so minting fresh IDs doesn't mint fresh allowances. No install ID (builds 1.0 (1)-(9)): per-IP
+// at free limits, which is how everything was metered before 2026-09-22.
+type Caller = { tier: Tier; usageKey: string; limits: Limits; checks: [string, Limits][] };
+
+const INSTALL_ID = /^[0-9a-f]{32}$/;
+
+function resolveCaller(req: express.Request): Caller {
+  const jws = req.header("x-aineko-membership");
+  const member = jws ? verifyMembershipCached(jws) : null;
+  if (member) {
+    const key = `member:${member.originalTransactionId}`;
+    return { tier: "member", usageKey: key, limits: MEMBER_LIMITS, checks: [[key, MEMBER_LIMITS]] };
+  }
+  const ipKey = `ip:${req.ip ?? "unknown"}`;
+  const install = req.header("x-aineko-install");
+  if (install && INSTALL_ID.test(install)) {
+    const key = `install:${install}`;
+    return {
+      tier: "free",
+      usageKey: key,
+      limits: FREE_LIMITS,
+      checks: [
+        [key, FREE_LIMITS],
+        [ipKey, IP_BACKSTOP_LIMITS],
+      ],
+    };
+  }
+  return { tier: "free", usageKey: ipKey, limits: FREE_LIMITS, checks: [[ipKey, FREE_LIMITS]] };
+}
+
 app.get("/models", bearerAuth(TOKEN), (_req, res) => {
   res.json({ models: MODELS, default: process.env.OPENROUTER_MODEL || MODELS[0]!.id });
 });
 
+// App-wide totals. Ops only -- builds 1.0 (1)-(9) showed this in Settings > Usage; newer builds
+// show GET /usage/me instead.
 app.get("/usage", bearerAuth(TOKEN), (_req, res) => {
   res.json({ ...getUsage(), budgetTokens: USAGE_TOKEN_BUDGET });
+});
+
+// The caller's own allowance, for Settings > Usage.
+app.get("/usage/me", bearerAuth(TOKEN), (req, res) => {
+  const caller = resolveCaller(req);
+  res.json({ tier: caller.tier, ...peekBudget(caller.usageKey, caller.limits) });
 });
 
 // 20 req/min/IP: generous for a human typing, tight enough to stop a script hammering the paid
@@ -106,11 +142,23 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
     res.status(400).json({ error: "history must be an array of up to 20 prior user/animal messages" });
     return;
   }
-  const clientIp = req.ip ?? "unknown";
-  const budget = checkBudget(clientIp, WEEKLY_TOKEN_LIMIT, MONTHLY_TOKEN_LIMIT);
-  if (!budget.allowed) {
-    res.status(429).json({ error: budget.reason });
+  const caller = resolveCaller(req);
+  if (ANIMALS[animal].membersOnly && caller.tier !== "member") {
+    res.status(403).json({ error: `the ${animal} is a members-only animal`, code: "members-only" });
     return;
+  }
+  for (const [key, limits] of caller.checks) {
+    const budget = checkBudget(key, limits);
+    if (!budget.allowed) {
+      res.status(429).json({
+        error: budget.reason,
+        code: "quota",
+        tier: caller.tier,
+        window: budget.window,
+        resetAt: new Date(budget.resetAt).toISOString(),
+      });
+      return;
+    }
   }
   // `res` "close" also fires after a normal response, so only an unfinished response counts as the
   // client walking away (req "close" is no good here -- it fires once the body has been read).
@@ -119,7 +167,8 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
     if (!res.writableFinished) disconnected.abort();
   });
   try {
-    const reply = await askAnimal(animal, message.trim(), clientIp, {
+    const reply = await askAnimal(animal, message.trim(), {
+      budgetKeys: caller.checks.map(([key]) => key),
       history,
       modelOverride: model,
       signal: disconnected.signal,
@@ -136,7 +185,7 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
 });
 
 const server = app.listen(PORT, () => {
-  log.info("listening", { port: PORT, trustProxyHops: TRUST_PROXY_HOPS });
+  log.info("listening", { port: PORT, trustProxyHops: TRUST_PROXY_HOPS, limits: LIMITS_SUMMARY });
 });
 
 // Docker and systemd both stop with SIGTERM. Let in-flight replies finish (they record their token

@@ -1,4 +1,4 @@
-export type AnimalId = "cat" | "dog" | "cow" | "duck" | "parrot" | "fish";
+export type AnimalId = "cat" | "dog" | "cow" | "duck" | "parrot" | "fish" | "horse" | "goat" | "snake";
 
 export type Animal = {
   id: AnimalId;
@@ -13,6 +13,9 @@ export type Animal = {
   // the human's own message. Without this flag the shared prompt forbids words outright, which
   // contradicted the parrot's personality and made its mimicry hit-or-miss.
   mimics?: true;
+  // Bonus animals unlocked by membership. Enforced here (POST /chat returns 403), not just hidden in
+  // the app, since the app's API token is public.
+  membersOnly?: true;
 };
 
 export const ANIMALS: Record<AnimalId, Animal> = {
@@ -96,6 +99,42 @@ export const ANIMALS: Record<AnimalId, Animal> = {
       "occasion it reacts at all, it's the smallest, most unbothered blub imaginable.",
     vocabulary: ["Blub", "blub blub", "...", "*bubble*"],
     triggers: [],
+  },
+  horse: {
+    id: "horse",
+    label: "horse",
+    personality:
+      "Twelve hundred pounds of muscle run by the nervous system of a startled rabbit. Terrified " +
+      "of plastic bags, puddles, and anything that was not in this exact spot yesterday, and every " +
+      "fright is a full-body event. Deeply, shamelessly food-motivated -- assumes every pocket holds " +
+      "a carrot and every conversation is a negotiation for one.",
+    vocabulary: ["Neigh", "Whinny", "Nicker", "Snort", "Pfffrrrt", "Squeal"],
+    triggers: ["carrot", "apple", "treat", "ride", "saddle", "bag", "vet", "trailer", "grass", "sugar"],
+    membersOnly: true,
+  },
+  goat: {
+    id: "goat",
+    label: "goat",
+    personality:
+      "Pure chaos with horizontal pupils. Does not bleat so much as scream, at full volume, at " +
+      "anything or nothing. Treats every object mentioned as a snack, including things that are not " +
+      "food and things that are not physically present. Climbs whatever is tallest, respects no " +
+      "boundary, regrets nothing.",
+    vocabulary: ["Meh", "MEHHH", "Baa", "BAAAAAH", "AAAAAAAAAA", "Bleat"],
+    triggers: ["food", "eat", "hungry", "paper", "hat", "shoe", "fence", "climb", "no", "roof"],
+    membersOnly: true,
+  },
+  snake: {
+    id: "snake",
+    label: "snake",
+    personality:
+      "Cold, patient, and completely unreadable. Mostly just flicks its tongue and tastes the air, " +
+      "privately deciding whether you are a threat, a heat source, or an unusually large mouse. " +
+      "Moves in slow, unsettling inches. When it does commit to a reaction, it is a hiss that ends " +
+      "the conversation.",
+    vocabulary: ["Hsss", "Sssss", "HSSSSSS", "*flick flick*", "..."],
+    triggers: ["mouse", "rat", "warm", "heat", "sun", "egg", "grab", "shed"],
+    membersOnly: true,
   },
 };
 

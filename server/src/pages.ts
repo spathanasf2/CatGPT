@@ -39,26 +39,32 @@ export function privacyHtml(): string {
   return page(
     "Privacy Policy — Aineko",
     `<h1>Privacy Policy</h1>
-<p><small>Last updated: 2026-09-21</small></p>
+<p><small>Last updated: 2026-09-22</small></p>
 <p>Aineko is a simple chat app. This page describes exactly what happens to your data -- nothing
 more is collected than what's listed here.</p>
 <h2>What we collect</h2>
 <p>Nothing that identifies you personally, and no account or sign-in is required. The app does not
 use analytics, advertising, or tracking SDKs of any kind.</p>
+<p>To keep usage fair, our server keeps a running count of how much AI processing (measured in
+"tokens") has been used by each install of the app, identified by a random ID the app creates the
+first time it runs; by each IP address; and, for members, by each subscription, identified by
+Apple's transaction ID. These counts contain no message content and expire after about a month.</p>
 <h2>What happens to a message you send</h2>
-<p>The text you type is sent to our server, which forwards it to <a
-href="https://openrouter.ai">OpenRouter</a> and an underlying third-party AI model to generate a
-reply. We do not log or store the content of your messages -- our server only records that a
-request happened and how many tokens it used, for cost tracking. OpenRouter and the model
-provider handling the request have their own data practices; see <a
+<p>The app asks for your permission before sending anything. The text you type -- along with the
+last few messages of that conversation, so the animal can follow along -- is sent to our server,
+which forwards it to <a href="https://openrouter.ai">OpenRouter</a> and an underlying third-party
+AI model to generate a reply. We do not log or store the content of your messages. OpenRouter and
+the model provider handling the request have their own data practices; see <a
 href="https://openrouter.ai/privacy">OpenRouter's privacy policy</a> for how they handle a
-request while processing it.</p>
+request while processing it. You can review or withdraw your permission any time in the app under
+Settings &rsaquo; AI &amp; privacy.</p>
 <h2>Chat history</h2>
 <p>Your conversations are stored locally on your device only. We have no copy of them and cannot
 see them.</p>
 <h2>Payments</h2>
 <p>Subscriptions are handled entirely by Apple's App Store billing (StoreKit). We never see your
-payment details.</p>
+payment details or your Apple ID. To confirm a membership is active, the app sends our server
+Apple's signed record of the subscription (product, transaction ID, and expiry date).</p>
 <h2>Contact</h2>
 <p><a href="mailto:aineko@bromsg.com">aineko@bromsg.com</a></p>
 <p><small><a href="/terms">Acceptable Use</a></small></p>`,

@@ -1,4 +1,4 @@
-export type AnimalId = "cat" | "dog" | "cow" | "duck" | "parrot" | "fish";
+export type AnimalId = "cat" | "dog" | "cow" | "duck" | "parrot" | "fish" | "horse" | "goat" | "snake";
 
 export type AnimalMeta = {
   id: AnimalId;
@@ -6,6 +6,8 @@ export type AnimalMeta = {
   emoji: string;
   accent: string;
   thinking: string;
+  // Unlocked by membership (the server enforces this too -- server/src/animals.ts).
+  membersOnly?: boolean;
 };
 
 export const ANIMALS: AnimalMeta[] = [
@@ -15,6 +17,9 @@ export const ANIMALS: AnimalMeta[] = [
   { id: "duck", label: "Duck", emoji: "\u{1F986}", accent: "#f2d060", thinking: "waddling over" },
   { id: "parrot", label: "Parrot", emoji: "\u{1F99C}", accent: "#7fd858", thinking: "repeating something" },
   { id: "fish", label: "Fish", emoji: "\u{1F420}", accent: "#5eb3e0", thinking: "just staring" },
+  { id: "horse", label: "Horse", emoji: "\u{1F434}", accent: "#c7794f", thinking: "eyeing your pockets", membersOnly: true },
+  { id: "goat", label: "Goat", emoji: "\u{1F410}", accent: "#e08f9e", thinking: "chewing your sleeve", membersOnly: true },
+  { id: "snake", label: "Snake", emoji: "\u{1F40D}", accent: "#a3b85c", thinking: "tasting the air", membersOnly: true },
 ];
 
 export function animalById(id: AnimalId): AnimalMeta {

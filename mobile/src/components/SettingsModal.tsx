@@ -5,9 +5,10 @@ type Props = {
   onClearChats: () => void;
   onOpenUsage: () => void;
   onOpenMembership: () => void;
+  onOpenPrivacy: () => void;
 };
 
-export function SettingsModal({ onClose, onClearChats, onOpenUsage, onOpenMembership }: Props) {
+export function SettingsModal({ onClose, onClearChats, onOpenUsage, onOpenMembership, onOpenPrivacy }: Props) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -17,6 +18,9 @@ export function SettingsModal({ onClose, onClearChats, onOpenUsage, onOpenMember
         </button>
         <button className="settings-row-btn" onClick={onOpenUsage}>
           Usage
+        </button>
+        <button className="settings-row-btn" onClick={onOpenPrivacy}>
+          AI &amp; privacy
         </button>
         <button
           className="danger-btn"

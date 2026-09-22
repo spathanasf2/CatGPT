@@ -14,11 +14,15 @@ import {
   type ChatMessage,
 } from "@/lib/chats";
 import { useViewportHeight } from "@/lib/use-viewport-height";
+import { newId } from "@/lib/ids";
+import { grantConsent, loadConsent, revokeConsent } from "@/lib/consent";
+import { refreshMembership } from "@/lib/membership";
 import { Sidebar } from "@/components/Sidebar";
 import { SettingsModal } from "@/components/SettingsModal";
 import { UsageModal } from "@/components/UsageModal";
 import { MembershipModal } from "@/components/MembershipModal";
 import { BootScreen } from "@/components/BootScreen";
+import { ConsentModal } from "@/components/ConsentModal";
 
 const DEFAULT_ANIMAL: AnimalId = ANIMALS[0]!.id;
 
@@ -46,23 +50,40 @@ function ensureDraft(list: Chat[]): { chats: Chat[]; activeId: string } {
   return { chats: [chat, ...list], activeId: chat.id };
 }
 
+function formatDay(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+
 // Phrased as a stage direction like every other animal line. The raw error is for the console,
 // not for the person chatting.
 function errorMessage(err: unknown, animal: AnimalId): ChatMessage {
   console.warn("chat request failed", err);
   const label = animalById(animal).label.toLowerCase();
   const kind: ChatErrorKind = err instanceof ChatError ? err.kind : "unavailable";
-  const limit = err instanceof Error ? /(weekly|monthly) usage limit reached, resets (\S+)/.exec(err.message) : null;
+  const quota = err instanceof ChatError ? err.quota : undefined;
+  const period = quota?.window === "monthly" ? "month" : "week";
   const copy: Record<ChatErrorKind, string> = {
     offline: `*the ${label} can't hear you.* Check your connection and try again.`,
     timeout: `*the ${label} wandered off mid-thought.* Try again?`,
     "rate-limited": `*the ${label} needs a breather.* You're sending messages faster than it can keep up -- give it a minute.`,
-    quota: limit
-      ? `*the ${label} is all talked out.* You've hit the ${limit[1]} chat limit -- it resets ${limit[2]}.`
-      : `*the ${label} is all talked out.* You've hit the chat limit for now.`,
+    // "About 10x" mirrors FREE_FRACTION=0.1 in server/src/limits.ts.
+    quota: !quota
+      ? `*the ${label} is all talked out.* You've hit the chat limit for now.`
+      : quota.tier === "free"
+        ? `*the ${label} is all talked out.* You've used this ${period}'s free chats -- they come back ${formatDay(quota.resetAt)}. Members get about 10\u00d7 more.`
+        : `*the ${label} is all talked out.* You've used this ${period}'s chats -- they come back ${formatDay(quota.resetAt)}.`,
+    "members-only": `*the ${label} only talks to members.* Bonus animals come with a membership.`,
     unavailable: `*the ${label} didn't answer.* Something went wrong on our end -- try again in a bit.`,
   };
-  return { id: crypto.randomUUID(), role: "error", text: copy[kind], animal, retryable: kind !== "quota" };
+  const offerMembership = kind === "members-only" || (kind === "quota" && quota?.tier !== "member");
+  return {
+    id: newId(),
+    role: "error",
+    text: copy[kind],
+    animal,
+    retryable: kind !== "quota" && kind !== "members-only",
+    ...(offerMembership ? { action: "membership" as const } : {}),
+  };
 }
 
 export default function Home() {
@@ -76,6 +97,12 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [showUsage, setShowUsage] = useState(false);
   const [showMembership, setShowMembership] = useState(false);
+  // "ask" on first launch (or on a send without permission), "review" from Settings.
+  const [consentMode, setConsentMode] = useState<"ask" | "review" | null>(null);
+  const [consentedAt, setConsentedAt] = useState<string | null>(null);
+  // A message someone tried to send before giving permission -- sent once they allow it.
+  const sendAfterConsent = useRef<string | null>(null);
+  const [member, setMember] = useState(false);
   const [input, setInput] = useState("");
   // Chats currently awaiting a reply, and which animal is doing the thinking. Per chat, so a
   // pending reply in one chat doesn't show its thinking bubble in (or lock the composer of)
@@ -88,8 +115,30 @@ export default function Home() {
     const { chats: initial, activeId } = ensureDraft(loadChats());
     setChats(initial);
     setActiveChatId(activeId);
+    setConsentedAt(loadConsent());
     setHydrated(true);
   }, []);
+
+  // StoreKit is the source of truth for membership. Re-read on returning to the foreground too: a
+  // renewal issues a new signed transaction, and the old one stops verifying once it expires.
+  useEffect(() => {
+    const refresh = () => {
+      refreshMembership()
+        .then(setMember)
+        .catch(() => undefined);
+    };
+    refresh();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
+  // First launch: ask for AI permission as the boot screen clears (see ConsentModal).
+  useEffect(() => {
+    if (hydrated && bootDone && !loadConsent()) setConsentMode("ask");
+  }, [hydrated, bootDone]);
 
   // Matches BootScreen's own on-screen duration -- kept as a separate timer (not tied to
   // `hydrated`, which typically resolves almost instantly) so the two can be intentionally
@@ -119,8 +168,9 @@ export default function Home() {
   // (which resolves almost instantly): firing this the moment data loads focused the input
   // while the boot screen was still covering it, popping the keyboard mid-loading-animation
   // instead of in unison with the chat UI actually appearing.
+  // (Skipped while the first-launch permission sheet is up -- allowing it focuses from its tap.)
   useEffect(() => {
-    if (hydrated && bootDone) inputRef.current?.focus();
+    if (hydrated && bootDone && loadConsent()) inputRef.current?.focus();
   }, [hydrated, bootDone]);
 
   // iOS only shows the on-screen keyboard for a .focus() call made *synchronously* inside a real
@@ -179,11 +229,41 @@ export default function Home() {
     setChats((prev) => prev.map((c) => (c.id === chatId ? { ...c, messages: [...c.messages, message] } : c)));
   }
 
+  // Called from the sheet's button tap, so focusing here (after a synchronous commit) still counts
+  // as inside the gesture and brings the keyboard up -- same reasoning as focusComposerNow.
+  function handleAllowConsent() {
+    setConsentedAt(grantConsent());
+    if (consentMode !== "ask") return;
+    const queued = sendAfterConsent.current;
+    sendAfterConsent.current = null;
+    flushSync(() => setConsentMode(null));
+    focusComposerNow();
+    if (queued) void handleSend(queued);
+  }
+
+  function handleDeclineConsent() {
+    sendAfterConsent.current = null;
+    setConsentMode(null);
+  }
+
+  function handleRevokeConsent() {
+    revokeConsent();
+    setConsentedAt(null);
+  }
+
+  function handleAnimalPick(animal: AnimalId) {
+    if (animalById(animal).membersOnly && !member) {
+      setShowMembership(true);
+      return;
+    }
+    handleAnimalChange(animal);
+  }
+
   async function requestReply(chatId: string, animal: AnimalId, text: string, history: HistoryItem[]) {
     setPending((prev) => ({ ...prev, [chatId]: animal }));
     try {
       const reply = await askAnimal(animal, text, history);
-      appendMessage(chatId, { id: crypto.randomUUID(), role: "animal", animal, ...reply });
+      appendMessage(chatId, { id: newId(), role: "animal", animal, ...reply });
     } catch (err) {
       appendMessage(chatId, errorMessage(err, animal));
     } finally {
@@ -198,6 +278,11 @@ export default function Home() {
   async function handleSend(overrideText?: string) {
     const text = (overrideText ?? input).trim();
     if (!text || !activeChat || pending[activeChat.id]) return;
+    if (!loadConsent()) {
+      sendAfterConsent.current = text;
+      setConsentMode("ask");
+      return;
+    }
     const chatId = activeChat.id;
     const animal = activeChat.animal;
     const isFirstUserMessage = !activeChat.messages.some((m) => m.role === "user");
@@ -210,7 +295,7 @@ export default function Home() {
             ? {
                 ...c,
                 title: isFirstUserMessage ? titleFromFirstMessage(text) : c.title,
-                messages: [...c.messages, { id: crypto.randomUUID(), role: "user", text }],
+                messages: [...c.messages, { id: newId(), role: "user", text }],
               }
             : c,
         ),
@@ -266,11 +351,12 @@ export default function Home() {
             <select
               className="animal-select"
               value={activeChat.animal}
-              onChange={(e) => handleAnimalChange(e.target.value as AnimalId)}
+              onChange={(e) => handleAnimalPick(e.target.value as AnimalId)}
             >
               {ANIMALS.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.emoji} {a.label}
+                  {a.membersOnly && !member ? " \u{1F512}" : ""}
                 </option>
               ))}
             </select>
@@ -303,6 +389,15 @@ export default function Home() {
                             onClick={() => handleRetry(m.id)}
                           >
                             Try again
+                          </button>
+                        )}
+                        {m.action === "membership" && !member && (
+                          <button
+                            className="error-action-btn"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => setShowMembership(true)}
+                          >
+                            See membership
                           </button>
                         )}
                       </div>
@@ -395,10 +490,31 @@ export default function Home() {
             setShowSettings(false);
             setShowMembership(true);
           }}
+          onOpenPrivacy={() => {
+            setShowSettings(false);
+            setConsentMode("review");
+          }}
         />
       )}
-      {showUsage && <UsageModal onClose={() => setShowUsage(false)} />}
-      {showMembership && <MembershipModal onClose={() => setShowMembership(false)} />}
+      {showUsage && (
+        <UsageModal
+          onClose={() => setShowUsage(false)}
+          onOpenMembership={() => {
+            setShowUsage(false);
+            setShowMembership(true);
+          }}
+        />
+      )}
+      {showMembership && <MembershipModal onClose={() => setShowMembership(false)} onMembershipChange={setMember} />}
+      {consentMode && (
+        <ConsentModal
+          mode={consentMode}
+          consentedAt={consentedAt}
+          onAllow={handleAllowConsent}
+          onRevoke={handleRevokeConsent}
+          onClose={consentMode === "ask" ? handleDeclineConsent : () => setConsentMode(null)}
+        />
+      )}
     </div>
   );
 }

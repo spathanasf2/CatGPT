@@ -1,5 +1,6 @@
 import type { AnimalId } from "./animals";
 import type { ChatMessage } from "./chats";
+import { apiHeaders, serverConfigured, SERVER_URL } from "./api";
 
 export type AnimalReply = {
   sounds: string;
@@ -12,19 +13,20 @@ export type HistoryItem =
 
 // What went wrong, in terms the UI can phrase for a person -- the raw error text ("Load failed",
 // "The operation was aborted.") is never meant to reach the chat.
-export type ChatErrorKind = "offline" | "timeout" | "rate-limited" | "quota" | "unavailable";
+export type ChatErrorKind = "offline" | "timeout" | "rate-limited" | "quota" | "members-only" | "unavailable";
+
+// For "quota": which allowance ran out and when it comes back.
+export type QuotaDetail = { tier: "free" | "member"; window: "weekly" | "monthly"; resetAt: string };
 
 export class ChatError extends Error {
   constructor(
     readonly kind: ChatErrorKind,
     message: string,
+    readonly quota?: QuotaDetail,
   ) {
     super(message);
   }
 }
-
-const URL = process.env.NEXT_PUBLIC_AINEKO_SERVER_URL;
-const TOKEN = process.env.NEXT_PUBLIC_AINEKO_TOKEN;
 
 // Matches the server's own window (server/src/history.ts), which it enforces regardless.
 const HISTORY_LIMIT = 8;
@@ -55,18 +57,15 @@ export async function askAnimal(
   history: HistoryItem[],
   timeoutMs = 25_000,
 ): Promise<AnimalReply> {
-  if (!URL || !TOKEN) throw new ChatError("unavailable", "Aineko server URL or token not configured");
+  if (!serverConfigured()) throw new ChatError("unavailable", "Aineko server URL or token not configured");
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     let res: Response;
     try {
-      res = await fetch(`${URL}/chat`, {
+      res = await fetch(`${SERVER_URL}/chat`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${TOKEN}`,
-        },
+        headers: { ...apiHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({ animal, message, history }),
         signal: ctrl.signal,
       });
@@ -75,14 +74,21 @@ export async function askAnimal(
       throw new ChatError("offline", err instanceof Error ? err.message : "network error");
     }
     const body = (await res.json().catch(() => null)) as
-      | { sounds?: unknown; narrative?: unknown; error?: unknown }
+      | { sounds?: unknown; narrative?: unknown; error?: unknown; code?: unknown; tier?: unknown; window?: unknown; resetAt?: unknown }
       | null;
     if (!res.ok) {
       const reason = typeof body?.error === "string" ? body.error : `server returned ${res.status}`;
-      if (res.status === 429) {
-        // The token budget's 429s name the window and reset date; the per-minute limiter's don't.
-        throw new ChatError(/usage limit/.test(reason) ? "quota" : "rate-limited", reason);
+      if (body?.code === "members-only") throw new ChatError("members-only", reason);
+      if (body?.code === "quota") {
+        const quota: QuotaDetail | undefined =
+          (body.tier === "free" || body.tier === "member") &&
+          (body.window === "weekly" || body.window === "monthly") &&
+          typeof body.resetAt === "string"
+            ? ({ tier: body.tier, window: body.window, resetAt: body.resetAt } as QuotaDetail)
+            : undefined;
+        throw new ChatError("quota", reason, quota);
       }
+      if (res.status === 429) throw new ChatError("rate-limited", reason);
       throw new ChatError("unavailable", reason);
     }
     if (!body || typeof body.sounds !== "string" || typeof body.narrative !== "string") {
