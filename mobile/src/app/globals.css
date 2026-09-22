@@ -1,0 +1,571 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #12121a;
+  color: #f2f0f5;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overscroll-behavior: none;
+  /* Nothing for iOS Safari to scroll -- see use-viewport-height.ts for why. */
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+/* Shell: pinned to the real visible viewport (see use-viewport-height.ts), not just
+   100dvh, so the on-screen keyboard compresses the message thread instead of dragging
+   the whole layout out of view. */
+.shell {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--app-top, 0px);
+  height: var(--app-height, 100dvh);
+  display: flex;
+  overflow: hidden;
+  /* There's an unavoidable lag between iOS panning the visual viewport and JS finding
+     out about it -- this doesn't remove that lag, it just turns the correction into a
+     slide instead of a jump-cut, so it reads as intentional rather than a glitch. */
+  transition: top 0.18s ease-out, height 0.18s ease-out;
+}
+
+/* Sidebar (mobile drawer, like ChatGPT/Claude's iOS apps -- hidden by default, slides
+   in over the chat rather than sitting as a permanent column) */
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 20;
+}
+
+.sidebar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 260px;
+  max-width: 82vw;
+  background: #17171f;
+  border-right: 1px solid #26262f;
+  display: flex;
+  flex-direction: column;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
+  transform: translateX(-100%);
+  transition: transform 0.22s ease;
+  z-index: 30;
+}
+
+.sidebar.open {
+  transform: translateX(0);
+}
+
+.sidebar-title {
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+  padding: 2px 4px 12px;
+}
+
+.sidebar-header {
+  padding-bottom: 8px;
+}
+
+.new-chat-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1.5px solid #2c2c37;
+  background: #1c1c26;
+  color: #f2f0f5;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.chat-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 6px;
+}
+
+.chat-list-empty {
+  color: #6f6c78;
+  font-size: 13px;
+  padding: 10px 8px;
+}
+
+.chat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 8px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #cfcdd6;
+  font-size: 13.5px;
+  text-align: left;
+}
+
+.chat-item.active {
+  background: #232330;
+  color: #fff;
+}
+
+.chat-item-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-item-delete {
+  color: #6f6c78;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.settings-btn {
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #26262f;
+  background: transparent;
+  color: #a9a6b3;
+  font-size: 13.5px;
+}
+
+/* Main pane */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 14px 10px;
+  background: #17171f;
+  border-bottom: 1px solid #26262f;
+  flex-shrink: 0;
+}
+
+.hamburger {
+  background: transparent;
+  border: none;
+  color: #f2f0f5;
+  font-size: 18px;
+  padding: 2px 4px;
+  flex-shrink: 0;
+}
+
+.topbar-title {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.animal-select {
+  margin-left: auto;
+  max-width: 60vw;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1.5px solid var(--accent);
+  background: #1c1c26;
+  color: #f2f0f5;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: #6f6c78;
+  padding: 20px;
+  text-align: center;
+}
+
+.empty-state .new-chat-btn {
+  width: auto;
+  padding: 10px 18px;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.row {
+  display: flex;
+}
+
+.row.user {
+  justify-content: flex-end;
+}
+
+.row.animal {
+  justify-content: flex-start;
+}
+
+.starter-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 12px 10px;
+  flex-shrink: 0;
+}
+
+.starter-chip {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1.5px solid #2c2c37;
+  background: #1c1c26;
+  color: #cfcdd6;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.starter-chip:disabled {
+  opacity: 0.5;
+}
+
+.bubble {
+  max-width: 78%;
+  padding: 10px 14px;
+  border-radius: 18px;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.bubble.user {
+  background: #3a3a46;
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.bubble.animal {
+  background: #1c1c26;
+  border: 1.5px solid var(--accent);
+  border-bottom-left-radius: 4px;
+}
+
+.bubble.error {
+  background: #2a1a1d;
+  border: 1.5px solid #6b3038;
+  color: #e3a5ab;
+  border-bottom-left-radius: 4px;
+}
+
+.sounds {
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: 0.01em;
+  color: #fff;
+}
+
+.narrative {
+  margin-top: 5px;
+  font-style: italic;
+  font-size: 13px;
+  color: #a29fac;
+}
+
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #8b8894;
+  font-size: 13px;
+  font-style: italic;
+}
+
+.dots span {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 1.1s infinite ease-in-out;
+}
+
+.dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes pulse {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.composer {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px calc(env(safe-area-inset-bottom, 0px) + 10px);
+  background: #17171f;
+  border-top: 1px solid #26262f;
+  flex-shrink: 0;
+}
+
+.composer input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 14px;
+  border-radius: 20px;
+  border: 1.5px solid #2c2c37;
+  background: #1c1c26;
+  color: #f2f0f5;
+  font-size: 15px;
+  outline: none;
+}
+
+.composer input:focus {
+  border-color: var(--accent);
+}
+
+.composer button {
+  padding: 0 18px;
+  border-radius: 20px;
+  border: none;
+  background: var(--accent);
+  color: #12121a;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.composer button:disabled {
+  opacity: 0.4;
+}
+
+/* Modals (New chat / Settings) -- bottom sheets, anchored to .shell */
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 40;
+}
+
+.modal {
+  width: 100%;
+  max-width: 420px;
+  background: #17171f;
+  border: 1px solid #26262f;
+  border-radius: 18px 18px 0 0;
+  padding: 20px 18px calc(env(safe-area-inset-bottom, 0px) + 20px);
+}
+
+.modal h2 {
+  margin: 0 0 14px;
+  font-size: 17px;
+}
+
+.settings-row-btn {
+  width: 100%;
+  padding: 11px;
+  border-radius: 12px;
+  border: 1px solid #26262f;
+  background: transparent;
+  color: #f2f0f5;
+  font-weight: 600;
+  font-size: 14px;
+  text-align: left;
+  margin-bottom: 10px;
+}
+
+.meter {
+  margin-bottom: 16px;
+}
+
+.meter-track {
+  height: 8px;
+  border-radius: 4px;
+  background: #232330;
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: #3987e5;
+  transition: width 0.3s ease;
+}
+
+.meter-label {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: #a29fac;
+}
+
+.usage-note {
+  font-size: 12px;
+  color: #6f6c78;
+  margin: 4px 0 16px;
+}
+
+.modal-row-label {
+  color: #8b8894;
+  font-size: 12px;
+  margin: 0 0 2px;
+}
+
+.modal-row-value {
+  font-size: 13.5px;
+  margin: 0 0 16px;
+  word-break: break-all;
+}
+
+.subscribe-btn {
+  width: 100%;
+  padding: 13px;
+  border-radius: 12px;
+  border: none;
+  background: var(--accent);
+  color: #12121a;
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 10px;
+}
+
+.subscribe-btn:disabled {
+  opacity: 0.5;
+}
+
+.modal-error {
+  color: #e3a5ab;
+  font-size: 13px;
+  margin: 0 0 10px;
+}
+
+.danger-btn {
+  width: 100%;
+  padding: 11px;
+  border-radius: 12px;
+  border: 1.5px solid #6b3038;
+  background: transparent;
+  color: #e3a5ab;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.modal-close-btn {
+  width: 100%;
+  padding: 11px;
+  border-radius: 12px;
+  border: none;
+  background: #232330;
+  color: #f2f0f5;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* Boot screen -- hands off from the native launch screen, same dark background, small centered
+   mark with a diagonal shine sweeping across it via a masked gradient (the mask is the logo's own
+   alpha channel, so the highlight is clipped exactly to the mark's silhouette). */
+.boot-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #12121a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.4s ease;
+}
+
+.boot-screen.boot-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.boot-mark {
+  position: relative;
+  width: 140px;
+  aspect-ratio: 611 / 744;
+}
+
+.boot-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.boot-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 40%, rgba(255, 255, 255, 0.9) 50%, transparent 60%);
+  background-size: 300% 300%;
+  -webkit-mask-image: url("/aineko-mark.png");
+  mask-image: url("/aineko-mark.png");
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  mix-blend-mode: overlay;
+  animation: boot-shimmer-sweep 1.6s ease-in-out infinite;
+}
+
+@keyframes boot-shimmer-sweep {
+  0% {
+    background-position: 150% -50%;
+  }
+  100% {
+    background-position: -50% 150%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boot-shimmer {
+    animation: none;
+  }
+}
