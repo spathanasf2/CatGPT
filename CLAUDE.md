@@ -13,10 +13,12 @@ qoracle: a static Next.js client wrapped later in Capacitor, plus a tiny server 
 API key so it's never shipped in the client bundle.
 
 ## Layout
-- `server/` — Express + TypeScript. Holds the OpenRouter key. `POST /chat {animal, message, model?}`
-  -> `{sounds, narrative}` (`model` is an internal/ops override, never sent by the app — see
-  below); `GET /models` and `GET /usage` are the same kind of internal/testing surface, not called
-  by the app UI either. Animal roster + system prompt in `src/animals.ts` / `src/openrouter.ts`;
+- `server/` — Express + TypeScript. Holds the OpenRouter key.
+  `POST /chat {animal, message, history?, model?}` -> `{sounds, narrative}` (`history` = the last
+  few user/animal turns, see "Conversation memory" below; `model` is an internal/ops override, never
+  sent by the app — see below); `GET /models` is the same kind of internal/testing surface. `GET
+  /usage` (app-wide token totals) **is** called by the app, from Settings > Usage -- which is a
+  problem for production, see "Open decisions" at the bottom. Animal roster + system prompt in `src/animals.ts` / `src/openrouter.ts`;
   the model list in `src/models.ts` doubles as the automatic-fallback order (see below); token
   counting in `src/usage.ts`.
 - `mobile/` — Next.js (App Router), `output: "export"` static site. ChatGPT/Claude-style shell:
@@ -249,6 +251,13 @@ Mirrors qoracle's exact pattern:
   reboot was already warranted. If a future Caddyfile edit "succeeds" but doesn't seem to take
   effect, check whether `docker exec caddy md5sum /etc/caddy/Caddyfile` actually matches the host
   file before assuming the edit itself is wrong.
+  **Likely root cause (2026-09-22):** the Caddyfile is a *single-file* bind mount
+  (`./caddy/Caddyfile:/etc/caddy/Caddyfile:ro`), which pins the file's inode at container start.
+  Any edit that writes a new file and renames it over the old one (`sed -i`, most editors, Python's
+  atomic-save patterns) gives the host path a new inode the container never sees. **Edit it in
+  place** (truncate-and-write the same inode, e.g. `open(..., "r+")` or `cat tmp > Caddyfile`) and
+  confirm with `stat -c %i` before/after -- the 2026-09-22 trusted_proxies edit was done that way
+  and took effect on a plain `caddy reload`, no restart.
 - App Store Connect fields, now valid: Support URL `https://aineko.bromsg.com/`, Privacy URL
   `https://aineko.bromsg.com/privacy`, contact `aineko@bromsg.com`. Marketing URL left blank,
   matching qoracle.
@@ -261,9 +270,21 @@ Mirrors qoracle's exact pattern:
 - **Rate limiting** (`server/src/rate-limit.ts`, added 2026-09-21): 20 req/min/IP on `POST /chat`
   only, in-memory fixed-window, no dependency added. Deliberately content-blind -- it only counts
   requests, never inspects message text, so it can't contradict the "we don't log messages"
-  privacy policy. `app.set("trust proxy", true)` is required for this to work at all, since both
-  deployments (Caddy on Hetzner, Tailscale Serve on foundry) sit behind a reverse proxy and
-  `req.ip` would otherwise always be the proxy's address, not the real caller's.
+  privacy policy. Keys on `req.ip`, which only means anything if `trust proxy` matches the real
+  proxy chain -- see "Client IPs behind proxies" below.
+- **Client IPs behind proxies** (fixed 2026-09-22): originally `app.set("trust proxy", true)`,
+  which was wrong twice over. `aineko.bromsg.com` is Cloudflare-proxied (orange cloud), and Caddy
+  didn't trust Cloudflare, so Caddy overwrote X-Forwarded-For with the *Cloudflare edge* IP --
+  every user was bucketed by whichever edge node relayed them, sharing rate limits and budgets with
+  strangers. And `true` takes the left-most XFF entry, which is client-controlled whenever a proxy
+  passes XFF through. Now: `trust proxy` = `TRUST_PROXY_HOPS` (env, default 1 = foundry's Tailscale
+  Serve; `2` on Hetzner = Cloudflare -> Caddy), and the `aineko.bromsg.com` block in Hetzner's
+  Caddyfile has `trusted_proxies <Cloudflare ranges>` on its `reverse_proxy` (scoped to this one
+  site, not Caddy's global option, so no other service's behavior changed). Verified live: a
+  request from Hetzner through Cloudflare recorded Hetzner's own IP, and a forged
+  `X-Forwarded-For` was ignored. **If Cloudflare ever changes its ranges**
+  (https://www.cloudflare.com/ips/), update that Caddy block or users collapse back into edge-IP
+  buckets.
 - **OpenRouter account**: currently Frank's personal account, accepted as a short-term risk while
   Command Mine Labs LLC's registration is still in progress. The plan once it's registered: an
   OpenRouter **organizational account** (a real, documented account type in their ToS, distinct
@@ -286,8 +307,12 @@ Mirrors qoracle's exact pattern:
   `openrouter.ts` at the exact point actual usage is known (same call site as the global
   `recordUsage()`). `askAnimal()`'s signature changed to take `clientIp` as a required
   parameter for this reason.
-  - **Numbers, derived from real measured usage, not guessed:** this app's actual average is ~395
-    prompt / ~44 completion tokens per request (measured from live traffic). At
+  - **Numbers, derived from real measured usage, not guessed:** this app's actual average was ~395
+    prompt / ~44 completion tokens per request (measured from live traffic, before conversation
+    memory). With the full 8-turn history window a request measures ~780 prompt tokens (2026-09-22)
+    -- more tokens per message, but input-heavy, so the blended rate drops to ~$0.12/M and the
+    token-denominated caps below still bound worst-case cost (now ~$0.58/month); what shrinks is
+    messages-per-cap, to roughly 5-6k/month. At
     `google/gemini-2.5-flash-lite`'s real pricing ($0.10/$0.40 per M), that's a blended
     ~$0.13/M tokens for *this app's specific usage shape* -- don't reuse that blended rate for a
     different model or a system prompt of very different length, recompute it.
@@ -298,7 +323,13 @@ Mirrors qoracle's exact pattern:
     chatting with a cat for fun approaches it, so this only ever bites an actual abuse pattern.
   - Persisted like `usage.json` (`TOKEN_BUDGET_FILE` env var, points at the mounted volume on
     Hetzner) so quotas survive restarts/redeploys instead of giving every IP a free reset. Flushes
-    to disk on a 60s interval, not on every request.
+    to disk on a 60s interval, not on every request, plus on SIGTERM/SIGINT once in-flight replies
+    finish. Both files are written atomically (`src/atomic-write.ts`).
+  - **This never actually worked on Hetzner until 2026-09-22**: `~/services/aineko-data` was owned
+    by uid 1001 (`gork`) but the container runs as `node` (uid 1000), so every write failed with
+    EACCES (visible in `docker logs aineko`) and budgets silently reset on every redeploy. Fixed by
+    `chown 1000:1000 aineko-data`, same ownership as `qoracle-data`. Any new data volume for a
+    `USER node` container needs the same.
 
 ## Monetization
 Subscription model (unlike qoracle's one-consumable-plus-nonconsumables), priced deliberately low
@@ -541,3 +572,55 @@ dismiss the keyboard on tap -- easy to miss because nothing in `onClick` looks w
 Typechecked and built clean both locally and on the Mac. Shipped as build 1.0 (9) -- same
 established recipe (bump `CURRENT_PROJECT_VERSION` 8 -> 9, sync, rebuild, `cap sync ios`,
 unsigned archive, export with `destination: upload`).
+
+## Conversation memory + hardening pass (2026-09-22) -- server live, mobile waiting on build 1.0 (10)
+From a full review. **The repo had zero commits until this pass** -- nine TestFlight builds and a
+production deploy with no history. Baseline committed as-is (`ffb772b`, "as of build 1.0 (9)"),
+changes on top. Commit before every upload/deploy from now on, so any build can be traced back to
+source.
+
+**Conversation memory.** Every `/chat` used to send only the latest message, so "I'm going to call
+you Waffles" was forgotten by the next turn, and the prompt's "vary the joke across replies" was
+impossible (the model never saw its earlier replies). The client now sends the last 8 non-error
+turns as `history` (`toHistory()` in `mobile/src/lib/chat.ts`); the server validates and re-clips it
+(`server/src/history.ts`: max 8 kept, 500 chars each). In `buildMessages()`, the animal's own past
+replies become assistant turns (in its JSON reply shape), other animals' become bracketed "[The dog
+reacted: ...]" notes -- mid-chat animal switching now actually reads as a room, which is groundwork
+for v0.4 chatroom mode. Old builds send no `history` and keep working unchanged.
+
+**Parrot**: the shared prompt said "no other words, ever", contradicting the parrot's mimicry --
+it only mimicked some of the time, and sometimes put the mimicked words in the narrative. `mimics:
+true` on the `Animal` now swaps in a mimic-specific speech rule; verified it lands the fragment in
+`sounds` ("SQUAWK! RENT! AWK!", "SQUAWK! CRACKER! AWK!").
+
+**Server cost/reliability**: `max_tokens: 150` on every call (hard per-request cost ceiling;
+average reply ~44). Timeouts were 20s *per model* x3 while the client gave up at 20s total, so
+fallbacks only ran for users who had already seen an error; now 7s per model, 18s deadline for the
+whole chain (under old builds' 20s client timeout), new client timeout 25s, and the upstream call
+is aborted when the client disconnects. Graceful SIGTERM shutdown (Docker previously SIGKILLed after
+10s since node-as-PID-1 ignored SIGTERM).
+
+**Mobile** (in the tailnet demo now; needs build 1.0 (10) to reach TestFlight): in-character error
+bubbles with a "Try again" button that re-asks in place (instead of raw "Load failed" / "The
+operation was aborted."); pending/thinking state is per chat (it used to show in, and lock, whichever
+chat you switched to); Enter doesn't send while an IME candidate is being confirmed; continuing a
+chat moves it to the top and `ensureDraft()` finds the draft wherever it is; sidebar delete asks for
+confirmation and is a real sibling button (was a span nested in a button); Membership shows "Not
+available right now." instead of spinning forever when StoreKit returns no product. Verified with a
+Playwright run against the demo (14 checks, real server). Note `crypto.randomUUID` (used since
+build 1) needs iOS 15.4 while the deployment target is 15.0 -- harmless in practice, but either bump
+the target to 15.4 or add a fallback if it ever matters.
+
+
+## Open decisions (as of 2026-09-22) -- block App Store submission, not TestFlight
+1. **Membership screen needs Terms of Use (EULA) + Privacy Policy links** -- Apple requires both
+   in-app for auto-renewable subscriptions (guideline 3.1.2); a very common rejection.
+2. **"Unlimited chats" copy is false** -- membership unlocks nothing and subscribers hit the same
+   per-IP caps. Either gate something or reword (3.1.2(a) "ongoing value" risk).
+3. **Third-party AI consent** -- guideline 5.1.2(i) (Nov 2025) wants explicit permission before
+   user data goes to a third-party AI; messages go to OpenRouter.
+4. **Settings > Usage shows app-wide totals** (`GET /usage`) to every user against the 100k
+   placeholder -- exposes business numbers and will read "100% used" to everyone in production.
+5. **App still points at the tailnet URL** -- App Review can't reach it; switching to
+   `https://aineko.bromsg.com` needs a build. Production is now actually ready for it (per-IP
+   limits and persistence fixed 2026-09-22).
