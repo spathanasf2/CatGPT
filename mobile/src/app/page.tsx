@@ -353,12 +353,20 @@ export default function Home() {
               value={activeChat.animal}
               onChange={(e) => handleAnimalPick(e.target.value as AnimalId)}
             >
-              {ANIMALS.map((a) => (
+              {ANIMALS.filter((a) => !a.membersOnly).map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.emoji} {a.label}
-                  {a.membersOnly && !member ? " \u{1F512}" : ""}
                 </option>
               ))}
+              {/* Bonus animals grouped under their own header (a section break in iOS's native
+                  picker) rather than individually badged -- Frank: clear what's new, not "special". */}
+              <optgroup label="Members only">
+                {ANIMALS.filter((a) => a.membersOnly).map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.emoji} {a.label}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           ) : (
             <span className="topbar-title">Aineko</span>

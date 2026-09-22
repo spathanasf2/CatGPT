@@ -69,12 +69,7 @@ async function openChat(title) {
   await page.waitForTimeout(350);
   await page.locator(".chat-item-main", { hasText: title }).click();
   await page.waitForTimeout(700);
-  await page.evaluate(() => {
-    document.activeElement?.blur();
-    // Shown as a member sees it: the browser build can't reach StoreKit, so bonus animals would
-    // otherwise carry the non-member lock even in a chat that's plainly working.
-    for (const o of document.querySelectorAll(".animal-select option")) o.textContent = o.textContent.replace(" \u{1F512}", "");
-  });
+  await page.evaluate(() => document.activeElement?.blur());
   await page.waitForTimeout(200);
 }
 
