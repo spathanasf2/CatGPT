@@ -491,6 +491,11 @@ highest-leverage place to inject voice is therefore *not* individual hardcoded l
 `server/src/openrouter.ts`'s `buildSystemPrompt()`, since those steer every generated reply at
 once.
 
+**Banned words (Frank, 2026-09-22):** nothing a kid would get in trouble for saying out loud --
+"nicker" specifically (the horse whinnies instead), plus "pussycat"/"horny" as obvious cousins.
+The prompt asks; `server/src/kid-safe.ts` guarantees (swaps on every reply and on echoed history).
+Extend the list there when another one turns up.
+
 Changes: added a per-animal `triggers` field (`Animal` type, `animals.ts`) replacing the single
 generic hardcoded trigger-word list that used to apply identically to all six species regardless
 of whether it made sense (the old shared list included "good boy/girl" and "walk", which never
@@ -593,7 +598,9 @@ unsigned archive, export with `destination: upload`).
 From a full review. **The repo had zero commits until this pass** -- nine TestFlight builds and a
 production deploy with no history. Baseline committed as-is (`ffb772b`, "as of build 1.0 (9)"),
 changes on top. Commit before every upload/deploy from now on, so any build can be traced back to
-source.
+source. Remote: Gitea `admin/aineko` (https://git.bromsg.com/admin/aineko), pushed over the
+tailnet via the `gitea-aineko` SSH alias with deploy key `~/.ssh/aineko-deploy` (same pattern as
+`gitea-qoracle`).
 
 **Conversation memory.** Every `/chat` used to send only the latest message, so "I'm going to call
 you Waffles" was forgotten by the next turn, and the prompt's "vary the joke across replies" was
