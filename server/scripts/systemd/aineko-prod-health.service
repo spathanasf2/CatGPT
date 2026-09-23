@@ -1,0 +1,12 @@
+[Unit]
+Description=Aineko production health (aineko.bromsg.com + OpenRouter credit)
+Wants=network-online.target
+After=network-online.target
+OnFailure=cli-games-telegram-notify@%n.service
+
+[Service]
+Type=oneshot
+User=noderunner
+EnvironmentFile=/home/noderunner/aineko/server/.env
+ExecStart=/home/noderunner/aineko/server/scripts/prod-health.sh
+TimeoutStartSec=90

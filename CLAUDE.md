@@ -857,3 +857,28 @@ it later) keeps working. **Build 1.1 (16)** is the white (light icon, production
 build, made with `ios-build.sh hetzner --upload`. Screenshots: `app-store-6.5-v1.1/`. Review
 notes should mention the new bonus roster (Mortimer, Peanut, Tank, Barbara, Noodle), Make your
 own in the picker, and sharing.
+
+## Server batch, live in production 2026-09-23 (no app update needed)
+- **Replies in the user's language** (`server/src/language.ts`). Measured: "reply in the human's
+  language" (anywhere in the prompt, even beside the message) was ignored for French/Japanese/
+  German; naming the language ("Reply entirely in French") was followed. So the server detects the
+  language -- script ranges for Japanese/Korean/Chinese/Cyrillic/Arabic/Hebrew/Greek/Thai/Hindi,
+  common words + distinctive accents for Spanish/French/German/Portuguese/Italian/Dutch/Vietnamese
+  (shared accents like é/ê/ô deliberately excluded -- they caused ties) -- and names it both in a
+  bracketed note beside the message and in the system prompt. English adds nothing; unsure =
+  "unknown" and a generic note, never a wrong guess. Hayley (heavily English-primed: "MEOW MEOW
+  MEOW" in her vocabulary) went from 1/4 to 4/4 French narratives once both were in; her French
+  *sounds* still come out "MEOW". The kid-safe word list is English-only.
+- **Popularity counts**: `usage.json` / `GET /usage` now carry `byAnimal` (requests per character;
+  custom animals as `custom:<species>` -- never their names) and `shareLinkHits`.
+- **`GET /get`**: the share link. Counts the tap, redirects to `APP_STORE_URL` if set (make it an
+  App Analytics campaign link, `...?pt=<provider>&ct=sharecard`, so Apple attributes downloads),
+  else to the landing page. Set `APP_STORE_URL` in Hetzner's compose once the listing is live --
+  no app update needed. Nothing personal is recorded, so no privacy-label change.
+- **Production alerts to Frank's Telegram** (`server/scripts/prod-health.sh`, installed as system
+  units `aineko-prod-health.{service,timer}` from `server/scripts/systemd/`): every 5 minutes,
+  checks `aineko.bromsg.com/health`, the OpenRouter key's monthly cap ($50; alert under $5), and
+  the account's credit (alert under $10). Failures go through the box's existing
+  `cli-games-telegram-notify@` hook -- the message heading says "CLI-Games systemd failure"; the
+  unit name and exit code say it's Aineko (10 = down, 11 = key cap, 12 = account credit). Same
+  failure re-alerts every 6 hours at most. One test alert was sent on install.

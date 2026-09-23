@@ -3,6 +3,7 @@ import { ANIMALS, type AnimalId } from "./animals.js";
 import type { HistoryItem } from "./history.js";
 import { kidSafe } from "./kid-safe.js";
 import { isKnownNote } from "./memory-notes.js";
+import { detectLanguage } from "./language.js";
 import { MODELS } from "./models.js";
 import { recordUsage } from "./usage.js";
 import { recordTokens } from "./token-budget.js";
@@ -38,7 +39,7 @@ function who(animal: Animal, legacy: boolean): string {
 }
 
 // `memory` undefined = the app predates memory: no memory section, no "remember" field requested.
-function buildSystemPrompt(animal: Animal, legacy: boolean, memory: string[] | undefined): string {
+function buildSystemPrompt(animal: Animal, legacy: boolean, memory: string[] | undefined, language: string | null): string {
   const name = who(animal, legacy);
   const Name = cap(name);
   const They = cap(animal.pronoun);
@@ -81,7 +82,7 @@ Personality: ${animal.personality}
 
 ${triggerLine}${memorySection}
 
-Typical sounds ${name} makes: ${animal.vocabulary.join(", ")}. Not an exhaustive list -- stay strictly within realistic ${species} vocalizations and whatever the personality above implies about how ${animal.pronoun} uses sound. Never another species' sounds.
+Typical sounds ${name} makes${language ? ` (spelled in English -- respell them the way ${language === "unknown" ? "the human's language" : language} writes animal noises)` : ""}: ${animal.vocabulary.join(", ")}. Not an exhaustive list -- stay strictly within realistic ${species} vocalizations and whatever the personality above implies about how ${animal.pronoun} uses sound. Never another species' sounds.
 
 Keep every word family-friendly, including real animal words that sound rude when a kid reads them out loud -- never "nicker" (a horse whinnies).
 
@@ -91,7 +92,11 @@ Given the human's message, respond with a JSON object with exactly ${memory === 
 
 You may be shown the last few turns of the conversation. ${Name} still doesn't understand language, but like a real pet ${animal.pronoun} picks up on patterns: a name ${animal.pronoun} keeps being called, a word ${animal.pronoun} just heard, ${their} own mood carrying over from a moment ago. Never repeat an earlier reply's sounds or action verbatim. Bracketed notes like "[Koba the dog reacted: ...]" are other animals in the room -- notice them only the way a real ${species} would, and only ever answer as ${name}.
 
-Respond with ONLY the JSON object. No markdown, no code fences, no extra commentary.`;
+${
+    language
+      ? `\nThe human is writing in ${language === "unknown" ? "a language other than English" : language}. Everything you write -- sounds, narrative, remember -- must be in that language, however English the examples above are.\n\n`
+      : ""
+  }Respond with ONLY the JSON object. No markdown, no code fences, no extra commentary.`;
 }
 
 type ChatTurn = { role: "system" | "user" | "assistant"; content: string };
@@ -130,8 +135,13 @@ function buildMessages(
   // Memories go right next to the message they should color -- listed up in the system prompt, the
   // model almost never acted on them (2/20 callbacks in a measured run).
   if (memory?.length && animal.remembers) push("user", `[${animal.name} remembers: ${memory.join("; ")}]`);
+  // Non-English messages get their language named right next to them (language.ts has the
+  // measurements -- a vague "reply in the human's language" was ignored). English adds nothing.
+  const language = detectLanguage(message);
+  if (language === "unknown") push("user", "[Reply entirely in the language of the next message -- sounds spelled that language's way.]");
+  else if (language) push("user", `[Reply entirely in ${language} -- the narrative, any remember note, and the sounds spelled the way ${language} writes animal noises.]`);
   push("user", message);
-  return [{ role: "system", content: buildSystemPrompt(animal, legacy, memory) }, ...turns];
+  return [{ role: "system", content: buildSystemPrompt(animal, legacy, memory, language) }, ...turns];
 }
 
 function parseReply(
@@ -211,7 +221,7 @@ async function callOpenRouter(
   if (data.usage) {
     const prompt = data.usage.prompt_tokens ?? 0;
     const completion = data.usage.completion_tokens ?? 0;
-    recordUsage(prompt, completion);
+    recordUsage(prompt, completion, animal.id.startsWith("custom-") ? `custom:${animal.species}` : animal.id);
     recordTokens(budgetKeys, prompt + completion);
   }
 

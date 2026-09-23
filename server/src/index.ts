@@ -6,7 +6,7 @@ import { ANIMALS, resolveAnimal, type Animal } from "./animals.js";
 import { customAnimal, parseCustom } from "./custom.js";
 import { parseHistory, parseMemory } from "./history.js";
 import { MODELS, isAllowedModel } from "./models.js";
-import { getUsage } from "./usage.js";
+import { getUsage, recordShareLinkHit } from "./usage.js";
 import { landingHtml, privacyHtml, termsHtml } from "./pages.js";
 import { rateLimit } from "./rate-limit.js";
 import { checkBudget, flushBudget, peekBudget } from "./token-budget.js";
@@ -67,6 +67,16 @@ function sendPage(res: express.Response, html: string): void {
 app.get("/", (_req, res) => sendPage(res, landingHtml(process.env.APP_STORE_URL || undefined)));
 app.get("/privacy", (_req, res) => sendPage(res, privacyHtml()));
 app.get("/terms", (_req, res) => sendPage(res, termsHtml()));
+
+// The link shared reply cards carry. Counts the tap (a bare number) and sends people to the App
+// Store listing once APP_STORE_URL is set -- ideally an App Analytics campaign link
+// (...?pt=<provider>&ct=sharecard) so Apple attributes the downloads -- or to the landing page
+// until then. Lets the app ship this link before the listing exists.
+app.get("/get", (_req, res) => {
+  recordShareLinkHit();
+  res.setHeader("Cache-Control", "no-store");
+  res.redirect(302, process.env.APP_STORE_URL || "/");
+});
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true, animals: Object.keys(ANIMALS) });
