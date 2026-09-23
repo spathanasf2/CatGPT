@@ -909,3 +909,27 @@ from (`1.1-16`, ...) -- check out the tag to rebuild an older version.
   travels alone.
 - Review notes for 1.2 should mention the optional notifications and that nothing leaves the
   device for them.
+
+## Version 1.3 (built 2026-09-23): chatroom mode
+TestFlight 1.3 (18) points at foundry. Server support is in production (inert until a 1.3 client
+sends `room`). Its own release because it's the biggest change to how a chat works.
+- **A room is a chat with 2-4 animals** (`Chat.room`; `Chat.animal` stays the first of them so
+  single-animal code keeps working). Each message goes to every animal in turn, one `POST /chat`
+  each, so replies land one by one (staged reveal for free) and each animal's history includes
+  what the others just did this turn. Whoever the message names goes first ("Koba, sit!"), the
+  rest are shuffled per turn. One failing doesn't stop the rest; retry keeps the room context.
+  Memory and feelings stay per animal. Members-only/custom animals need membership in rooms too.
+- **Server**: `room` = the other animals (built-ins by id, custom with name + species, max 3) ->
+  a Room section in the prompt telling the animal who else is there and to work the others'
+  reactions in "more often than not" (first draft said "when it's funnier" and the model mostly
+  ignored the others -- four parallel chats; the stronger wording gets real interplay: Winston
+  riding Koba "as if Koba were a giant, furry cage", Peanut distrusting dinner "because anything
+  Koba likes must be a trap"). Per-minute limit raised 20 -> 40/IP (a room of four is four
+  requests a message); token budgets are what bound cost.
+- **Picker**: "One animal / Room" tabs; Room mode multi-selects 2-4 (checkmarks) with "Start room
+  with N" / "Update room". Top bar shows the room's stacked portraits + "Room"; sidebar rows too.
+  Picking one animal ends the room. Deleting a custom animal takes it out of any room (a room left
+  with one animal becomes a normal chat).
+- Rooms are open to free users with the free animals -- a product call worth revisiting (a room
+  costs N x per message, and free allowances are token-based, so free users just run out N x
+  faster).

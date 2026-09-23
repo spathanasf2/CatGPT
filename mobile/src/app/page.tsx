@@ -76,6 +76,21 @@ function lastTalkedTo(chats: Chat[]): AnimalRef | null {
   return chat ? chat.animal : null;
 }
 
+// Named animals go first ("Koba, sit!"), the rest in a fresh random order each turn.
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+function turnOrder(room: AnimalRef[], text: string): AnimalRef[] {
+  const lower = text.toLowerCase();
+  const mentions = (a: AnimalRef) => new RegExp(`\\b${escapeRegExp(animalById(a).name.toLowerCase())}\\b`).test(lower);
+  const named = room.filter(mentions);
+  const rest = room.filter((a) => !named.includes(a));
+  for (let i = rest.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [rest[i], rest[j]] = [rest[j]!, rest[i]!];
+  }
+  return [...named, ...rest];
+}
+
 function formatDay(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 }
@@ -299,10 +314,18 @@ export default function Home() {
     setActiveChatId(activeId);
   }
 
+  // Picking one animal also ends a room -- the chat goes back to one-on-one.
   function handleAnimalChange(animal: AnimalRef) {
     if (!activeChat) return;
     const id = activeChat.id;
-    setChats((prev) => prev.map((c) => (c.id === id ? { ...c, animal } : c)));
+    setChats((prev) => prev.map((c) => (c.id === id ? { ...c, animal, room: undefined } : c)));
+  }
+
+  function handleStartRoom(room: AnimalRef[]) {
+    setShowPicker(false);
+    if (!activeChat || room.length < 2) return;
+    const id = activeChat.id;
+    setChats((prev) => prev.map((c) => (c.id === id ? { ...c, animal: room[0]!, room } : c)));
   }
 
   function appendMessage(chatId: string, message: ChatMessage) {
@@ -395,19 +418,36 @@ export default function Home() {
     forgetAnimal(animal.id);
     forgetBonds(animal.id);
     setCustomAnimals(loadCustomAnimals());
-    setChats((prev) => prev.map((c) => (c.animal === animal.id ? { ...c, animal: DEFAULT_ANIMAL } : c)));
+    setChats((prev) =>
+      prev.map((c) => {
+        if (c.room?.includes(animal.id)) {
+          // Out of the room; a room of one is just a chat again.
+          const room = c.room.filter((a) => a !== animal.id);
+          return room.length >= 2 ? { ...c, room, animal: room[0]! } : { ...c, room: undefined, animal: room[0] ?? DEFAULT_ANIMAL };
+        }
+        return c.animal === animal.id ? { ...c, animal: DEFAULT_ANIMAL } : c;
+      }),
+    );
   }
 
-  async function requestReply(chatId: string, animal: AnimalRef, text: string, history: HistoryItem[]) {
+  // One animal's reply, appended to the chat and returned (null on error -- the error bubble is
+  // appended instead). In a room, `keepPending` holds the composer locked between animals.
+  async function requestReply(
+    chatId: string,
+    animal: AnimalRef,
+    text: string,
+    history: HistoryItem[],
+    opts: { roomMates?: AnimalRef[]; keepPending?: boolean } = {},
+  ): Promise<ChatMessage | null> {
     setPending((prev) => ({ ...prev, [chatId]: animal }));
     try {
       const before = bondFor(animal);
-      const reply = await askAnimal(animal, text, history, memoriesFor(animal), before);
+      const reply = await askAnimal(animal, text, history, memoriesFor(animal), before, opts.roomMates);
       replyHaptic();
       if (reply.remember) rememberFor(animal, reply.remember);
       if (reply.bond !== undefined) setBond(animal, reply.bond);
       const note = reply.bond !== undefined ? bondNote(animalById(animal).name, before, reply.bond) : null;
-      appendMessage(chatId, {
+      const message: ChatMessage = {
         id: newId(),
         role: "animal",
         animal,
@@ -415,15 +455,36 @@ export default function Home() {
         narrative: reply.narrative,
         ...(reply.remember ? { remembered: reply.remember } : {}),
         ...(note ? { bondNote: note } : {}),
-      });
+      };
+      appendMessage(chatId, message);
+      return message;
     } catch (err) {
       appendMessage(chatId, errorMessage(err, animal));
+      return null;
     } finally {
-      setPending((prev) => {
-        const next = { ...prev };
-        delete next[chatId];
-        return next;
+      if (!opts.keepPending) {
+        setPending((prev) => {
+          const next = { ...prev };
+          delete next[chatId];
+          return next;
+        });
+      }
+    }
+  }
+
+  // Chatroom turn: every animal reacts in turn, each seeing what the ones before it just did (their
+  // replies go into its history). Whoever the message names goes first; the rest are shuffled, so
+  // the same animal doesn't always get the last word. One failing doesn't stop the others.
+  async function roomTurn(chatId: string, room: AnimalRef[], text: string, before: ChatMessage[]) {
+    let seen = before;
+    const order = turnOrder(room, text);
+    for (let k = 0; k < order.length; k++) {
+      const animal = order[k]!;
+      const reply = await requestReply(chatId, animal, text, toHistory(seen), {
+        roomMates: room.filter((a) => a !== animal),
+        keepPending: k < order.length - 1,
       });
+      if (reply) seen = [...seen, reply];
     }
   }
 
@@ -437,6 +498,8 @@ export default function Home() {
     }
     const chatId = activeChat.id;
     const animal = activeChat.animal;
+    const room = activeChat.room;
+    const earlier = activeChat.messages;
     const isFirstUserMessage = !activeChat.messages.some((m) => m.role === "user");
     const history = toHistory(activeChat.messages);
     setInput("");
@@ -454,7 +517,8 @@ export default function Home() {
         chatId,
       ),
     );
-    await requestReply(chatId, animal, text, history);
+    if (room?.length) await roomTurn(chatId, room, text, earlier);
+    else await requestReply(chatId, animal, text, history);
   }
 
   // Re-asks the user message the error was answering, in place: the error bubble goes away and the
@@ -475,7 +539,9 @@ export default function Home() {
     setChats((prev) =>
       prev.map((c) => (c.id === chatId ? { ...c, messages: c.messages.filter((m) => m.id !== errorId) } : c)),
     );
-    void requestReply(chatId, animal, question.text, toHistory(messages.slice(0, userIndex)));
+    void requestReply(chatId, animal, question.text, toHistory(messages.slice(0, userIndex)), {
+      roomMates: activeChat.room?.filter((a) => a !== animal),
+    });
   }
 
   const currentAnimal = activeChat ? animalById(activeChat.animal) : null;
@@ -501,8 +567,16 @@ export default function Home() {
           </button>
           {activeChat && currentAnimal ? (
             <button className="animal-button" onClick={() => setShowPicker(true)} aria-label="Choose an animal">
-              <Avatar animal={currentAnimal} size={28} />
-              <span>{currentAnimal.name}</span>
+              {activeChat.room?.length ? (
+                <span className="avatar-stack">
+                  {activeChat.room.map((a) => (
+                    <Avatar key={a} animal={animalById(a)} size={28} />
+                  ))}
+                </span>
+              ) : (
+                <Avatar animal={currentAnimal} size={28} />
+              )}
+              <span>{activeChat.room?.length ? "Room" : currentAnimal.name}</span>
               <span className="animal-button-chevron" aria-hidden>
                 {"\u25BE"}
               </span>
@@ -632,7 +706,7 @@ export default function Home() {
                   // send. Safari reports it as keyCode 229 rather than via isComposing.
                   if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) handleSend();
                 }}
-                placeholder={`say something to ${currentAnimal?.name}...`}
+                placeholder={activeChat.room?.length ? "say something to the room..." : `say something to ${currentAnimal?.name}...`}
                 enterKeyHint="send"
               />
               <button
@@ -707,8 +781,15 @@ export default function Home() {
       {showPicker && activeChat && (
         <AnimalPicker
           current={activeChat.animal}
+          room={activeChat.room}
           customAnimals={customAnimals}
+          member={member}
           onPick={handleAnimalPick}
+          onStartRoom={handleStartRoom}
+          onNeedMembership={() => {
+            setShowPicker(false);
+            setShowMembership(true);
+          }}
           onClose={() => setShowPicker(false)}
         />
       )}

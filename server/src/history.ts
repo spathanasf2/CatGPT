@@ -1,4 +1,4 @@
-import { resolveAnimal, type SpeciesId } from "./animals.js";
+import { ANIMALS, resolveAnimal, type SpeciesId } from "./animals.js";
 import { CUSTOM_ID, CUSTOM_NAME, SPECIES } from "./custom.js";
 
 export type HistoryItem =
@@ -73,4 +73,36 @@ export function parseMemory(raw: unknown): string[] | undefined | null {
     .map((m) => m.trim().slice(0, MAX_MEMORY_CHARS))
     .filter(Boolean)
     .slice(-MAX_MEMORIES);
+}
+
+// Chatroom mode (1.3): the other animals in the room, so each one knows who it's sharing the stage
+// with. Built-ins by id; custom animals carry their validated name and species, as in history.
+export type RoomMate = { name: string; species: SpeciesId };
+const MAX_ROOMMATES = 3;
+
+/** undefined = not a room; null = malformed. */
+export function parseRoom(raw: unknown): RoomMate[] | undefined | null {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_ROOMMATES) return null;
+  const mates: RoomMate[] = [];
+  for (const entry of raw as unknown[]) {
+    if (typeof entry !== "object" || entry === null) return null;
+    const e = entry as Record<string, unknown>;
+    const builtIn = resolveAnimal(e.animal);
+    if (builtIn) {
+      mates.push({ name: ANIMALS[builtIn.id].name, species: ANIMALS[builtIn.id].species });
+    } else if (
+      typeof e.animal === "string" &&
+      CUSTOM_ID.test(e.animal) &&
+      typeof e.name === "string" &&
+      CUSTOM_NAME.test(e.name.trim()) &&
+      typeof e.species === "string" &&
+      Object.prototype.hasOwnProperty.call(SPECIES, e.species)
+    ) {
+      mates.push({ name: e.name.trim(), species: e.species as SpeciesId });
+    } else {
+      return null;
+    }
+  }
+  return mates;
 }

@@ -42,7 +42,15 @@ export function Sidebar({
             return (
               <div key={c.id} className={`chat-item${c.id === activeChatId ? " active" : ""}`}>
                 <button className="chat-item-main" onClick={() => onSelectChat(c.id)}>
-                  <Avatar animal={meta} size={22} />
+                  {c.room?.length ? (
+                    <span className="avatar-stack small">
+                      {c.room.slice(0, 3).map((a) => (
+                        <Avatar key={a} animal={animalById(a)} size={22} />
+                      ))}
+                    </span>
+                  ) : (
+                    <Avatar animal={meta} size={22} />
+                  )}
                   <span className="chat-item-title">{c.title}</span>
                 </button>
                 <button

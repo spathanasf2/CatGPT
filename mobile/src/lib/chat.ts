@@ -75,6 +75,8 @@ export async function askAnimal(
   history: HistoryItem[],
   memory: string[],
   bond: number | null,
+  // Chatroom mode: the other animals in the room.
+  roomMates?: AnimalRef[],
   timeoutMs = 25_000,
 ): Promise<AnimalReply> {
   if (!serverConfigured()) throw new ChatError("unavailable", "Aineko server URL or token not configured");
@@ -86,7 +88,15 @@ export async function askAnimal(
       res = await fetch(`${SERVER_URL}/chat`, {
         method: "POST",
         headers: { ...apiHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ animal, message, history, memory, bond, ...customBody(animal) }),
+        body: JSON.stringify({
+          animal,
+          message,
+          history,
+          memory,
+          bond,
+          ...customBody(animal),
+          ...(roomMates?.length ? { room: roomMates.map((id) => ({ animal: id, ...customLabel(id) })) } : {}),
+        }),
         signal: ctrl.signal,
       });
     } catch (err) {

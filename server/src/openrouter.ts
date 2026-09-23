@@ -1,6 +1,6 @@
 import type { Animal } from "./animals.js";
 import { ANIMALS, type AnimalId } from "./animals.js";
-import type { HistoryItem } from "./history.js";
+import type { HistoryItem, RoomMate } from "./history.js";
 import { kidSafe } from "./kid-safe.js";
 import { isKnownNote } from "./memory-notes.js";
 import { detectLanguage } from "./language.js";
@@ -51,6 +51,7 @@ function buildSystemPrompt(
   memory: string[] | undefined,
   language: string | null,
   bond: number | null,
+  room: RoomMate[] | undefined,
 ): string {
   const name = who(animal, legacy);
   const Name = cap(name);
@@ -93,6 +94,11 @@ What ${name} currently remembers about this human arrives as a bracketed note ri
       ? `\n- "bond": an integer from -2 to 2 -- how this exchange moved ${name}'s feelings toward the human, judged the way ${name} would (see Relationship). Most exchanges are 0.`
       : "";
   const fieldCount = 2 + (memory === undefined ? 0 : 1) + (bondField ? 1 : 0);
+  // Chatroom mode: the others share the stage, and the comedy is as much in how they react to each
+  // other as to the human.
+  const roomSection = room?.length
+    ? `\n\nRoom: ${name} is in the room with ${room.map((m) => `${m.name} (a ${m.species})`).join(", ")}. The human's message is to all of you. If any of the others already reacted this turn (their reactions arrive as bracketed notes just before the message), work at least one of them into ${name}'s reaction more often than not -- chase, copy, hide from, compete with, steal from, or blame them, the way a real ${species} would; a room of animals each reacting only to the human is the boring version. Keep your reply about ${name}; never narrate the others' actions for them.`
+    : "";
 
   const soundsRule = animal.mimics
     ? `no words of ${their} own, ever. Most replies should work in one or two words lifted straight from the human's message, mangled and shouted among the squawks (e.g. "SQUAWK! LASAGNA! RAWK!") -- the mimicry goes HERE in "sounds", never in the narrative`
@@ -102,7 +108,7 @@ What ${name} currently remembers about this human arrives as a bracketed note ri
 
 Personality: ${animal.personality}
 
-${triggerLine}${memorySection}${bondSection}
+${triggerLine}${memorySection}${bondSection}${roomSection}
 
 Typical sounds ${name} makes${language ? ` (spelled in English -- respell them the way ${language === "unknown" ? "the human's language" : language} writes animal noises)` : ""}: ${animal.vocabulary.join(", ")}. Not an exhaustive list -- stay strictly within realistic ${species} vocalizations and whatever the personality above implies about how ${animal.pronoun} uses sound. Never another species' sounds.
 
@@ -133,6 +139,7 @@ function buildMessages(
   history: HistoryItem[],
   memory: string[] | undefined,
   bond: number | null,
+  room: RoomMate[] | undefined,
   message: string,
 ): ChatTurn[] {
   const turns: ChatTurn[] = [];
@@ -165,7 +172,7 @@ function buildMessages(
   if (language === "unknown") push("user", "[Reply entirely in the language of the next message -- sounds spelled that language's way.]");
   else if (language) push("user", `[Reply entirely in ${language} -- the narrative, any remember note, and the sounds spelled the way ${language} writes animal noises.]`);
   push("user", message);
-  return [{ role: "system", content: buildSystemPrompt(animal, legacy, memory, language, bond) }, ...turns];
+  return [{ role: "system", content: buildSystemPrompt(animal, legacy, memory, language, bond, room) }, ...turns];
 }
 
 function parseReply(
@@ -267,6 +274,8 @@ export type AskOptions = {
   memory?: string[];
   // Feeling score from the app: undefined = app predates bonds, null = first meeting.
   bond?: number | null;
+  // Chatroom mode: the other animals in the room.
+  room?: RoomMate[];
   history?: HistoryItem[];
   modelOverride?: string;
   // Aborted when the caller disconnects, so nobody pays for fallback replies no one will read.
@@ -276,12 +285,12 @@ export type AskOptions = {
 export async function askAnimal(
   animal: Animal,
   message: string,
-  { budgetKeys, legacy = false, history = [], memory, bond: sentBond, modelOverride, signal }: AskOptions,
+  { budgetKeys, legacy = false, history = [], memory, bond: sentBond, room, modelOverride, signal }: AskOptions,
 ): Promise<AnimalReply> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured");
   const bond = sentBond === undefined ? null : currentBond(animal, sentBond);
-  const messages = buildMessages(animal, legacy, history, memory, bond, message);
+  const messages = buildMessages(animal, legacy, history, memory, bond, room, message);
 
   const primary = modelOverride || process.env.OPENROUTER_MODEL || MODELS[0]!.id;
   const candidates = [primary, ...MODELS.map((m) => m.id).filter((id) => id !== primary)];

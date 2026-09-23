@@ -30,6 +30,9 @@ export type Chat = {
   // Who the dropdown currently points at -- new messages go to this animal, but past
   // "animal" messages carry their own `animal` so switching mid-chat doesn't relabel history.
   animal: AnimalRef;
+  // Chatroom mode (1.3): 2-4 animals who all react to each message, in turn. `animal` stays the
+  // first of them so everything that expects one animal keeps working.
+  room?: AnimalRef[];
   title: string;
   messages: ChatMessage[];
   createdAt: number;
@@ -66,8 +69,10 @@ export function loadChats(): Chat[] {
 // on load, so the rest of the app only ever sees character ids.
 function migrateAnimals(chat: Chat): Chat {
   const fix = (id: unknown): AnimalRef => normalizeAnimalId(id) ?? ANIMALS[0]!.id;
+  const room = chat.room?.map((id) => normalizeAnimalId(id)).filter((id): id is AnimalRef => id !== null);
   return {
     ...chat,
+    ...(room && room.length >= 2 ? { room } : { room: undefined }),
     animal: fix(chat.animal),
     messages: (chat.messages ?? []).map((m) =>
       m.role === "animal" || (m.role === "error" && m.animal) ? { ...m, animal: fix(m.animal) } : m,

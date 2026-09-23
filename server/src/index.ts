@@ -4,7 +4,7 @@ import { log } from "./log.js";
 import { askAnimal } from "./openrouter.js";
 import { ANIMALS, resolveAnimal, type Animal } from "./animals.js";
 import { customAnimal, parseCustom } from "./custom.js";
-import { parseHistory, parseMemory } from "./history.js";
+import { parseHistory, parseMemory, parseRoom } from "./history.js";
 import { parseBond } from "./bond.js";
 import { MODELS, isAllowedModel } from "./models.js";
 import { getUsage, recordShareLinkHit } from "./usage.js";
@@ -131,12 +131,22 @@ app.get("/usage/me", bearerAuth(TOKEN), (req, res) => {
   res.json({ tier: caller.tier, ...peekBudget(caller.usageKey, caller.limits) });
 });
 
-// 20 req/min/IP: generous for a human typing, tight enough to stop a script hammering the paid
-// endpoint. Blind to content by design -- only ever sees request counts, never message text.
-const chatRateLimit = rateLimit(20, 60_000);
+// 40 req/min/IP: generous for a human typing -- a chatroom of four animals is four requests per
+// message (1.3) -- and still tight enough to stop a script hammering the paid endpoint; the token
+// budgets are what actually bound cost. Blind to content by design -- only ever counts requests.
+const chatRateLimit = rateLimit(40, 60_000);
 
 app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
-  const { animal, custom: rawCustom, message, model, history: rawHistory, memory: rawMemory, bond: rawBond } = req.body ?? {};
+  const {
+    animal,
+    custom: rawCustom,
+    message,
+    model,
+    history: rawHistory,
+    memory: rawMemory,
+    bond: rawBond,
+    room: rawRoom,
+  } = req.body ?? {};
   // Either a built-in (by id) or a custom animal the app describes in full (members only).
   let character: Animal;
   let legacy = false;
@@ -179,6 +189,11 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
     res.status(400).json({ error: "bond must be null or an integer from -10 to 10" });
     return;
   }
+  const room = parseRoom(rawRoom);
+  if (room === null) {
+    res.status(400).json({ error: "room must list 1 to 3 other animals" });
+    return;
+  }
   const caller = resolveCaller(req);
   if (character.membersOnly && caller.tier !== "member") {
     const name = legacy ? `the ${character.species}` : character.name;
@@ -209,6 +224,7 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
       legacy,
       memory,
       bond,
+      room,
       budgetKeys: caller.checks.map(([key]) => key),
       history,
       modelOverride: model,
