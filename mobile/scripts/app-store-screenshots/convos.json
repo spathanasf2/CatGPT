@@ -1,14 +1,14 @@
 {
- "dog-1": [
+ "koba": [
   {
    "role": "user",
    "text": "I'm exhausted. I can't even walk to the mailbox."
   },
   {
    "role": "animal",
-   "animal": "dog",
-   "sounds": "Woof! Woof!",
-   "narrative": "*Wags tail furiously, already halfway to the door, certain a walk is about to happen.*"
+   "animal": "koba",
+   "sounds": "Woo-woo!",
+   "narrative": "*Koba bounces excitedly, already halfway to the door, ready for a walk.*"
   },
   {
    "role": "user",
@@ -16,9 +16,9 @@
   },
   {
    "role": "animal",
-   "animal": "dog",
-   "sounds": "Whine... Arf?",
-   "narrative": "*Lets out a confused whine, then perks up slightly at the sound of 'work', which sounds vaguely like 'walk' and therefore might be fun.*"
+   "animal": "koba",
+   "sounds": "Rrrrrr... huff.",
+   "narrative": "*Koba flops onto his back, paws in the air, refusing to move until it's not 'hot' anymore.*"
   },
   {
    "role": "user",
@@ -26,117 +26,21 @@
   },
   {
    "role": "animal",
-   "animal": "dog",
-   "sounds": "BORK BORK!",
-   "narrative": "*Wiggles entire body, tail wagging so hard it's a blur, because 'good boy' is the best phrase in the history of all things.*"
+   "animal": "koba",
+   "sounds": "Woof! Boof!",
+   "narrative": "*Koba nudges his human's hand with his nose, demanding pets and affirming his status as a good boy.*"
   }
  ],
- "dog-2": [
-  {
-   "role": "user",
-   "text": "I'm exhausted. I can't even walk to the mailbox."
-  },
-  {
-   "role": "animal",
-   "animal": "dog",
-   "sounds": "Woof! Woof!",
-   "narrative": "*Tail wags furiously as the dog spins in a circle, ready for a walk.*"
-  },
-  {
-   "role": "user",
-   "text": "No, I'm TIRED. Long day at work."
-  },
-  {
-   "role": "animal",
-   "animal": "dog",
-   "sounds": "Whine... awoo?",
-   "narrative": "*Head cocks to the side, listening intently, still hopeful for a walk.*"
-  },
-  {
-   "role": "user",
-   "text": "Okay fine. Who's a good boy?"
-  },
-  {
-   "role": "animal",
-   "animal": "dog",
-   "sounds": "ARF! ARF!",
-   "narrative": "*Dog immediately stops whining and jumps up, wagging its tail, expecting praise.*"
-  }
- ],
- "cat-1": [
-  {
-   "role": "user",
-   "text": "I got promoted today!!"
-  },
-  {
-   "role": "animal",
-   "animal": "cat",
-   "sounds": "Mrow!",
-   "narrative": "*blinks slowly, unimpressed, then yawns showing teeth*"
-  },
-  {
-   "role": "user",
-   "text": "You could at least pretend to be happy for me"
-  },
-  {
-   "role": "animal",
-   "animal": "cat",
-   "sounds": "Mew?",
-   "narrative": "*tilts head, as if considering the possibility of a treat arriving any second now.*"
-  },
-  {
-   "role": "user",
-   "text": "I bought you a new bed. It was expensive."
-  },
-  {
-   "role": "animal",
-   "animal": "cat",
-   "sounds": "Purrrrrrrr",
-   "narrative": "*immediately curls up in the new bed, purring loudly, pretending it was always meant for them.*"
-  }
- ],
- "cat-2": [
-  {
-   "role": "user",
-   "text": "I got promoted today!!"
-  },
-  {
-   "role": "animal",
-   "animal": "cat",
-   "sounds": "Mrow!",
-   "narrative": "*yawns and stretches, stretching one paw out in an elegant, lazy arc.*"
-  },
-  {
-   "role": "user",
-   "text": "You could at least pretend to be happy for me"
-  },
-  {
-   "role": "animal",
-   "animal": "cat",
-   "sounds": "Meeeew.",
-   "narrative": "*blinks slowly, eyes half-closed, clearly unimpressed.*"
-  },
-  {
-   "role": "user",
-   "text": "I bought you a new bed. It was expensive."
-  },
-  {
-   "role": "animal",
-   "animal": "cat",
-   "sounds": "Mrrrp.",
-   "narrative": "*looks up at the mention of 'bed', then pointedly grooms a paw, as if to say 'already have one, thanks.'*"
-  }
- ],
- "room-1": [
+ "room": [
   {
    "role": "user",
    "text": "I burned the lasagna again"
   },
   {
    "role": "animal",
-   "animal": "parrot",
+   "animal": "winston",
    "sounds": "SQUAWK! LASAGNA! RAWK!",
-   "narrative": "*flaps wings excitedly, hoping for a handout*"
+   "narrative": "*Winston hops excitedly on his perch, a tiny plastic fork suddenly appearing in his beak.*"
   },
   {
    "role": "user",
@@ -144,9 +48,9 @@
   },
   {
    "role": "animal",
-   "animal": "cat",
-   "sounds": "Mrow?",
-   "narrative": "*tilts head, entirely focused on the parrot's enthusiastic squawking about a potential meal*"
+   "animal": "hayley",
+   "sounds": "Mrrow?",
+   "narrative": "*Hayley tilts her head, wondering if 'lasagna' means 'food' and if the human requires assistance cleaning up their mess.*"
   },
   {
    "role": "user",
@@ -154,85 +58,64 @@
   },
   {
    "role": "animal",
-   "animal": "dog",
-   "sounds": "WHINE WOOF WOOF",
-   "narrative": "*ears perk up, head cocks to the side, convinced 'lasagna' means 'walk'*"
+   "animal": "koba",
+   "sounds": "Rrrrrrr woof",
+   "narrative": "*Koba looks up, ears perked, certain 'lasagna' is code for 'dinner.'*"
   }
  ],
- "room-2": [
+ "hayley": [
   {
    "role": "user",
-   "text": "I burned the lasagna again"
+   "text": "Sorry, dinner's going to be late tonight"
   },
   {
    "role": "animal",
-   "animal": "parrot",
-   "sounds": "SQUAWK! LASAGNA! RAWK!",
-   "narrative": "*tilts head, bits of burnt noodle stuck to beak*"
+   "animal": "hayley",
+   "sounds": "MEOW MEOW MEOW",
+   "narrative": "*Hayley stares pointedly at the kitchen, then back at her human, with an expression of profound betrayal.*",
+   "remembered": "dinner was late"
   },
   {
    "role": "user",
-   "text": "Don't look at me like that"
+   "text": "Thanks for the mouse... I guess"
   },
   {
    "role": "animal",
-   "animal": "cat",
-   "sounds": "Mrow",
-   "narrative": "*slowly blinks, then turns to stare intently at the oven, as if expecting a stray noodle to fall out.*"
+   "animal": "hayley",
+   "sounds": "Prrrt",
+   "narrative": "*Hayley chirps proudly, assuming the \"mouse\" was a term of endearment for a different gift.*"
   },
   {
    "role": "user",
-   "text": "Okay, who wants the burnt lasagna?"
+   "text": "Where were you all night?"
   },
   {
    "role": "animal",
-   "animal": "dog",
-   "sounds": "Whine whine WOOF!",
-   "narrative": "*tail wags furiously, anticipating a treat, even though the word 'lasagna' was said*"
+   "animal": "hayley",
+   "sounds": "Mrrp",
+   "narrative": "*Hayley stretches languidly, then saunters over and rubs against her human's legs, purring contentedly.*"
   }
  ],
- "goat-1": [
+ "tank": [
   {
    "role": "user",
-   "text": "Please don't eat my homework"
+   "text": "I brought you a carrot"
   },
   {
    "role": "animal",
-   "animal": "goat",
-   "sounds": "MEHHHHHHHHHHH",
-   "narrative": "*The goat stares intently at the pile of paper, ready to devour the entire assignment.*"
+   "animal": "tank",
+   "sounds": "Neigh!",
+   "narrative": "*Snorts excitedly, head bobbing, clearly expecting a treat.*"
   },
   {
    "role": "user",
-   "text": "That was a history essay!"
+   "text": "...and it's in this plastic bag"
   },
   {
    "role": "animal",
-   "animal": "goat",
-   "sounds": "BAAAAAAH! MEH!",
-   "narrative": "*The goat believes 'history' is a type of delicious grain and tries to gobble it down.*"
-  }
- ],
- "goat-2": [
-  {
-   "role": "user",
-   "text": "Please don't eat my homework"
-  },
-  {
-   "role": "animal",
-   "animal": "goat",
-   "sounds": "MEHHH BAAAAAH",
-   "narrative": "*Ignores the plea and munches enthusiastically on the paper, leaving a trail of shredded words.*"
-  },
-  {
-   "role": "user",
-   "text": "That was a history essay!"
-  },
-  {
-   "role": "animal",
-   "animal": "goat",
-   "sounds": "AAAAAAAAAA BAAAAAAAH",
-   "narrative": "*Headbutts the remaining paper scraps, searching for more historical snacks.*"
+   "animal": "tank",
+   "sounds": "Pfffrrrt! Squeal! Neigh!",
+   "narrative": "*Stomps a front hoof, eyes wide with panic, backing away from the dreaded plastic bag.*"
   }
  ]
 }

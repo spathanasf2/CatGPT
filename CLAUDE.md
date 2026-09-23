@@ -816,3 +816,40 @@ script and all carry the light icon, including foundry-pointed 13 and 14.
 **Version numbers:** once 1.0 is approved and released, App Store Connect closes the 1.0 "train" --
 every later upload, TestFlight included, needs `MARKETING_VERSION` bumped (1.0.1 or 1.1, both
 configs in project.pbxproj). The script names its output directory from both numbers.
+
+## Version 1.1 (2026-09-23): drawn animals, picker sheet, share cards, haptic
+Build 1.1 (15) went to TestFlight against foundry (dark icon) -- first build made with
+`ios-build.sh`. Everything below is on foundry; production gets it with the post-approval deploy.
+- **Art in code** (`mobile/src/lib/avatars.ts`): flat 100x100 SVG portraits, one drawing function
+  per species, 3-5 "looks" each (dog breeds: boxer/golden/lab/chihuahua/mutt; color patterns for
+  the rest). Hayley (gray tabby, green eyes) and Koba (brown boxer, black mask, white chin) were
+  drawn from Frank's photos (`~/deliverables/aineko/IMG_9953.PNG` = Koba, `IMG_9954.PNG` = Hayley).
+  `avatarUri()` for `<img>`, `avatarSvg()` for canvas; circles tinted from the animal's accent via
+  `avatarBackground()` so black coats still read. New looks: add to `LOOKS` there **and**
+  `LOOK_NOUNS` in `server/src/custom.ts` (the noun the prompt uses, "a hyper golden retriever").
+- **Picker sheet** (`components/AnimalPicker.tsx`) replaced the native `<select>`, which can only
+  show text. Sections: the free six, "Members only" under a thin divider, "Your animals" + Make
+  your own. Portraits also beside replies, in the sidebar, memories, Your animals, membership
+  perks, and as species/look rows in the editor.
+- **Share cards** (`lib/share-card.ts`): the reply (and the message it answered) drawn on a canvas
+  with the portrait and the mark, content-sized; shared via `@capacitor/filesystem` (cache file)
+  + `@capacitor/share` (`files:`); browser falls back to Web Share or a download. The share button
+  sits in each animal bubble's top-right corner. `NSPhotoLibraryAddUsageDescription` is in
+  Info.plist -- without it, tapping "Save Image" in the share sheet crashes the app.
+  Canvas `roundRect()` is iOS 16+, so it's drawn by hand (target is 15.0).
+- **Haptic** (`lib/haptics.ts`): light impact when a reply lands, native only.
+- New native plugins (pinned): `@capacitor/share` 7.0.4, `@capacitor/haptics` 7.0.5,
+  `@capacitor/filesystem` 7.1.8. On the Mac a fresh checkout needs `npm ci` before
+  `ios-build.sh` (the script doesn't install dependencies); `cap sync` inside it runs pod install.
+- Server drops memory notes under three words ("walk", "plastic bag" are keywords, not memories).
+- **App Store screenshots for 1.1**: `~/deliverables/aineko/app-store-6.5-v1.1/` (Koba, the
+  lasagna room, Hayley with one memory line, Tank, the picker, Make your own). Script:
+  `mobile/scripts/app-store-screenshots/shots.mjs` + `convos.json` (real replies, best of two runs;
+  memory lines hidden except Hayley's first). Run on the Mac in WebKit; it fakes membership in the
+  test browser only (for the editor) the same way the UI tests do.
+
+**Shipping 1.1 once 1.0 is approved:** (1) deploy the server to Hetzner (rsync + compose build/up
+aineko) -- backward compatible with 1.0 builds via the legacy species-id mapping; (2) on the Mac,
+bump `CURRENT_PROJECT_VERSION` in the repo, rsync, `npm ci`, `ios-build.sh hetzner --upload`
+(light icon, production URL); (3) submit that build with the v1.1 screenshots and review notes
+that mention the new bonus roster, Make your own, and sharing.
