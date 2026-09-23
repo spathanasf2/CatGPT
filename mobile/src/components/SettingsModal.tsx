@@ -8,6 +8,10 @@ type Props = {
   onOpenPrivacy: () => void;
   onOpenMemories: () => void;
   onOpenYourAnimals: () => void;
+  // "Let them miss you": on/off, or null where notifications aren't available (browser).
+  nudges: boolean | null;
+  onToggleNudges: () => void;
+  onPreviewNudge: () => void;
 };
 
 export function SettingsModal({
@@ -18,6 +22,9 @@ export function SettingsModal({
   onOpenPrivacy,
   onOpenMemories,
   onOpenYourAnimals,
+  nudges,
+  onToggleNudges,
+  onPreviewNudge,
 }: Props) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -35,6 +42,18 @@ export function SettingsModal({
         <button className="settings-row-btn" onClick={onOpenMemories}>
           What they remember
         </button>
+        {nudges !== null && (
+          <div className="nudge-row">
+            <button className="settings-row-btn nudge-toggle" onClick={onToggleNudges}>
+              Let them miss you <span className={`nudge-state${nudges ? " on" : ""}`}>{nudges ? "On" : "Off"}</span>
+            </button>
+            {nudges && (
+              <button className="link-btn" onClick={onPreviewNudge}>
+                Preview in 5 seconds (leave the app to see it)
+              </button>
+            )}
+          </div>
+        )}
         <button className="settings-row-btn" onClick={onOpenPrivacy}>
           AI &amp; privacy
         </button>

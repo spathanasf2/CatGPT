@@ -4,6 +4,7 @@ import type { HistoryItem } from "./history.js";
 import { kidSafe } from "./kid-safe.js";
 import { isKnownNote } from "./memory-notes.js";
 import { detectLanguage } from "./language.js";
+import { applyBondDelta, currentBond, describeBond } from "./bond.js";
 import { MODELS } from "./models.js";
 import { recordUsage } from "./usage.js";
 import { recordTokens } from "./token-budget.js";
@@ -27,6 +28,9 @@ export type AnimalReply = {
   narrative: string;
   // A note the character decided to hold onto; the app stores it and sends it back as `memory`.
   remember?: string;
+  // How the character now feels about the person (-10..10), after this exchange -- the app stores it
+  // and sends it back as `bond`.
+  bond?: number;
 };
 
 const POSSESSIVE = { she: "her", he: "his", it: "its" } as const;
@@ -39,7 +43,15 @@ function who(animal: Animal, legacy: boolean): string {
 }
 
 // `memory` undefined = the app predates memory: no memory section, no "remember" field requested.
-function buildSystemPrompt(animal: Animal, legacy: boolean, memory: string[] | undefined, language: string | null): string {
+// `bond`: the current feeling score, or null when there's none to track (app predates bonds, or
+// the character has no feelings -- Kevin).
+function buildSystemPrompt(
+  animal: Animal,
+  legacy: boolean,
+  memory: string[] | undefined,
+  language: string | null,
+  bond: number | null,
+): string {
   const name = who(animal, legacy);
   const Name = cap(name);
   const They = cap(animal.pronoun);
@@ -72,6 +84,16 @@ What ${name} currently remembers about this human arrives as a bracketed note ri
         ? `\n- "remember": ONE short note (a full phrase under 15 words, never a single word), phrased the way ${name} would think it, whenever the human's message touches something ${name} is described above as remembering -- a promise, a delay, a slight, a gift, whatever fits that list. Note what actually happened, not a guess at what will. Everything else, including ordinary chatter, is null. Never note something already remembered.`
         : `\n- "remember": always null.`;
 
+  const bondSection =
+    bond !== null && animal.bond
+      ? `\n\nRelationship: ${animal.bond.style} Right now ${name} ${describeBond(bond)}; the same note arrives in brackets beside the human's latest message. Let it show in behavior -- a wary animal keeps its distance, a devoted one can't get close enough.`
+      : "";
+  const bondField =
+    bond !== null && animal.bond
+      ? `\n- "bond": an integer from -2 to 2 -- how this exchange moved ${name}'s feelings toward the human, judged the way ${name} would (see Relationship). Most exchanges are 0.`
+      : "";
+  const fieldCount = 2 + (memory === undefined ? 0 : 1) + (bondField ? 1 : 0);
+
   const soundsRule = animal.mimics
     ? `no words of ${their} own, ever. Most replies should work in one or two words lifted straight from the human's message, mangled and shouted among the squawks (e.g. "SQUAWK! LASAGNA! RAWK!") -- the mimicry goes HERE in "sounds", never in the narrative`
     : "no other words, ever";
@@ -80,15 +102,15 @@ What ${name} currently remembers about this human arrives as a bracketed note ri
 
 Personality: ${animal.personality}
 
-${triggerLine}${memorySection}
+${triggerLine}${memorySection}${bondSection}
 
 Typical sounds ${name} makes${language ? ` (spelled in English -- respell them the way ${language === "unknown" ? "the human's language" : language} writes animal noises)` : ""}: ${animal.vocabulary.join(", ")}. Not an exhaustive list -- stay strictly within realistic ${species} vocalizations and whatever the personality above implies about how ${animal.pronoun} uses sound. Never another species' sounds.
 
 Keep every word family-friendly, including real animal words that sound rude when a kid reads them out loud -- never "nicker" (a horse whinnies).
 
-Given the human's message, respond with a JSON object with exactly ${memory === undefined ? "two" : "three"} fields:
+Given the human's message, respond with a JSON object with exactly ${["two", "three", "four"][fieldCount - 2]} fields:
 - "sounds": a short burst of onomatopoeia (roughly 1 to 6 sounds) reacting emotionally, written the way a comic renders animal noise (e.g. "BORK BORK BORK"). This is literally everything ${name} "says" -- ${soundsRule}.
-- "narrative": one short, funny, third-person stage direction wrapped in asterisks. Describe a specific physical action, not a vague mood -- "paws at the door, certain a walk is imminent" beats "seems happy." When a recognized word applies, show what ${name} seems to think ${animal.pronoun} heard, even if it's a comically wrong read of the actual message, and commit to that misunderstanding completely. Not every reply needs a misheard word, though -- when nothing recognizable is in the message, just react to the emotional tone of what was said, in character. One sentence. Vary the joke shape across replies; don't lean on the same beat every time.${rememberField}
+- "narrative": one short, funny, third-person stage direction wrapped in asterisks. Describe a specific physical action, not a vague mood -- "paws at the door, certain a walk is imminent" beats "seems happy." When a recognized word applies, show what ${name} seems to think ${animal.pronoun} heard, even if it's a comically wrong read of the actual message, and commit to that misunderstanding completely. Not every reply needs a misheard word, though -- when nothing recognizable is in the message, just react to the emotional tone of what was said, in character. One sentence. Vary the joke shape across replies; don't lean on the same beat every time.${rememberField}${bondField}
 
 You may be shown the last few turns of the conversation. ${Name} still doesn't understand language, but like a real pet ${animal.pronoun} picks up on patterns: a name ${animal.pronoun} keeps being called, a word ${animal.pronoun} just heard, ${their} own mood carrying over from a moment ago. Never repeat an earlier reply's sounds or action verbatim. Bracketed notes like "[Koba the dog reacted: ...]" are other animals in the room -- notice them only the way a real ${species} would, and only ever answer as ${name}.
 
@@ -110,6 +132,7 @@ function buildMessages(
   legacy: boolean,
   history: HistoryItem[],
   memory: string[] | undefined,
+  bond: number | null,
   message: string,
 ): ChatTurn[] {
   const turns: ChatTurn[] = [];
@@ -135,13 +158,14 @@ function buildMessages(
   // Memories go right next to the message they should color -- listed up in the system prompt, the
   // model almost never acted on them (2/20 callbacks in a measured run).
   if (memory?.length && animal.remembers) push("user", `[${animal.name} remembers: ${memory.join("; ")}]`);
+  if (bond !== null && animal.bond) push("user", `[${animal.name} ${describeBond(bond)}]`);
   // Non-English messages get their language named right next to them (language.ts has the
   // measurements -- a vague "reply in the human's language" was ignored). English adds nothing.
   const language = detectLanguage(message);
   if (language === "unknown") push("user", "[Reply entirely in the language of the next message -- sounds spelled that language's way.]");
   else if (language) push("user", `[Reply entirely in ${language} -- the narrative, any remember note, and the sounds spelled the way ${language} writes animal noises.]`);
   push("user", message);
-  return [{ role: "system", content: buildSystemPrompt(animal, legacy, memory, language) }, ...turns];
+  return [{ role: "system", content: buildSystemPrompt(animal, legacy, memory, language, bond) }, ...turns];
 }
 
 function parseReply(
@@ -150,6 +174,7 @@ function parseReply(
   legacy: boolean,
   wantsMemory: boolean,
   memory: string[],
+  bond: number | null,
 ): AnimalReply {
   let parsed: unknown;
   try {
@@ -172,6 +197,7 @@ function parseReply(
   if (wantsMemory && animal.remembers && substantial && remember.toLowerCase() !== "null" && !isKnownNote(remember, memory, animal.name)) {
     reply.remember = kidSafe(remember.slice(0, 120));
   }
+  if (bond !== null && animal.bond) reply.bond = applyBondDelta(bond, obj.bond);
   return reply;
 }
 
@@ -181,6 +207,7 @@ async function callOpenRouter(
   legacy: boolean,
   wantsMemory: boolean,
   memory: string[],
+  bond: number | null,
   messages: ChatTurn[],
   budgetKeys: string[],
   signal: AbortSignal,
@@ -228,7 +255,7 @@ async function callOpenRouter(
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error(`openrouter returned no content (${model})`);
 
-  return parseReply(content, animal, legacy, wantsMemory, memory);
+  return parseReply(content, animal, legacy, wantsMemory, memory, bond);
 }
 
 export type AskOptions = {
@@ -238,6 +265,8 @@ export type AskOptions = {
   legacy?: boolean;
   // This character's remembered notes, from the app. Undefined = the app predates memory.
   memory?: string[];
+  // Feeling score from the app: undefined = app predates bonds, null = first meeting.
+  bond?: number | null;
   history?: HistoryItem[];
   modelOverride?: string;
   // Aborted when the caller disconnects, so nobody pays for fallback replies no one will read.
@@ -247,11 +276,12 @@ export type AskOptions = {
 export async function askAnimal(
   animal: Animal,
   message: string,
-  { budgetKeys, legacy = false, history = [], memory, modelOverride, signal }: AskOptions,
+  { budgetKeys, legacy = false, history = [], memory, bond: sentBond, modelOverride, signal }: AskOptions,
 ): Promise<AnimalReply> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured");
-  const messages = buildMessages(animal, legacy, history, memory, message);
+  const bond = sentBond === undefined ? null : currentBond(animal, sentBond);
+  const messages = buildMessages(animal, legacy, history, memory, bond, message);
 
   const primary = modelOverride || process.env.OPENROUTER_MODEL || MODELS[0]!.id;
   const candidates = [primary, ...MODELS.map((m) => m.id).filter((id) => id !== primary)];
@@ -262,7 +292,7 @@ export async function askAnimal(
   for (const model of candidates) {
     if (stop.aborted) break;
     try {
-      return await callOpenRouter(model, animal, legacy, memory !== undefined, memory ?? [], messages, budgetKeys, stop);
+      return await callOpenRouter(model, animal, legacy, memory !== undefined, memory ?? [], bond, messages, budgetKeys, stop);
     } catch (err) {
       lastError = err;
       log.warn("model failed, trying next fallback", {

@@ -5,6 +5,7 @@ import { askAnimal } from "./openrouter.js";
 import { ANIMALS, resolveAnimal, type Animal } from "./animals.js";
 import { customAnimal, parseCustom } from "./custom.js";
 import { parseHistory, parseMemory } from "./history.js";
+import { parseBond } from "./bond.js";
 import { MODELS, isAllowedModel } from "./models.js";
 import { getUsage, recordShareLinkHit } from "./usage.js";
 import { landingHtml, privacyHtml, termsHtml } from "./pages.js";
@@ -135,7 +136,7 @@ app.get("/usage/me", bearerAuth(TOKEN), (req, res) => {
 const chatRateLimit = rateLimit(20, 60_000);
 
 app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
-  const { animal, custom: rawCustom, message, model, history: rawHistory, memory: rawMemory } = req.body ?? {};
+  const { animal, custom: rawCustom, message, model, history: rawHistory, memory: rawMemory, bond: rawBond } = req.body ?? {};
   // Either a built-in (by id) or a custom animal the app describes in full (members only).
   let character: Animal;
   let legacy = false;
@@ -173,6 +174,11 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
     res.status(400).json({ error: "memory must be an array of up to 20 strings" });
     return;
   }
+  const bond = parseBond(rawBond);
+  if (bond === "invalid") {
+    res.status(400).json({ error: "bond must be null or an integer from -10 to 10" });
+    return;
+  }
   const caller = resolveCaller(req);
   if (character.membersOnly && caller.tier !== "member") {
     const name = legacy ? `the ${character.species}` : character.name;
@@ -202,6 +208,7 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
     const reply = await askAnimal(character, message.trim(), {
       legacy,
       memory,
+      bond,
       budgetKeys: caller.checks.map(([key]) => key),
       history,
       modelOverride: model,

@@ -11,6 +11,8 @@ export type ChatMessage =
       narrative: string;
       // The memory this reply created, if any -- shown under the bubble.
       remembered?: string;
+      // Set when this reply moved the animal's feelings into a new level ("is warming up to you").
+      bondNote?: { text: string; warmer: boolean };
     }
   // `animal` / `retryable` / `action` are absent on errors saved by builds 1.0 (1)-(9).
   | {

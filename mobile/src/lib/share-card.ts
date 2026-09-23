@@ -71,7 +71,7 @@ export async function renderShareCard({ animal, sounds, narrative, said }: Share
   const saidH = saidLines.length ? saidLines.length * 52 + 56 : 0;
   const bubbleH = 44 + soundLines.length * 76 + 20 + narrativeLines.length * 54 + 40;
   // Sized to the content (plus room for the footer), so a two-word reply isn't lost in a square.
-  const H = Math.max(720, PAD + saidH + (saidH ? 48 : 0) + bubbleH + 96 + 64 + PAD);
+  const H = Math.max(720, PAD + saidH + (saidH ? 48 : 0) + bubbleH + 96 + 96 + PAD);
   canvas.width = W;
   canvas.height = H;
 
@@ -109,11 +109,15 @@ export async function renderShareCard({ animal, sounds, narrative, said }: Share
 
   // Footer: the mark and the name.
   const mark = await loadImage("/aineko-mark.png").catch(() => null);
-  const fy = H - PAD - 64;
+  const fy = H - PAD - 96;
   if (mark) ctx.drawImage(mark, PAD, fy, 64 * (mark.width / mark.height), 64);
   ctx.fillStyle = "#f2f0f5";
   ctx.font = `800 44px ${FONT}`;
   ctx.fillText("Aineko", PAD + 72, fy + 46);
+  // The address, for when the image travels without the link (saved, reposted).
+  ctx.fillStyle = "#8b8894";
+  ctx.font = `500 26px ${FONT}`;
+  ctx.fillText("aineko.bromsg.com", PAD + 72, fy + 84);
   ctx.fillStyle = "#8b8894";
   ctx.font = `500 32px ${FONT}`;
   const tag = `${animal.name} the ${animal.species}`;

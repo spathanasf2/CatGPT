@@ -89,6 +89,14 @@ export const QUIRKS: Record<string, string> = {
 };
 export const MAX_QUIRKS = 2;
 
+const BOND_STYLE: Record<Level, string> = {
+  [-2]: "Very hard to win over: kindness barely registers, slights register fully.",
+  [-1]: "Slow to warm up.",
+  0: "Warms to kindness and cools at unkindness, in fair measure.",
+  1: "Warms up easily.",
+  2: "Loves easily and forgives instantly.",
+};
+
 export type CustomSpec = {
   id: string;
   name: string;
@@ -154,6 +162,8 @@ export function customAnimal(spec: CustomSpec): Animal {
     vocabulary: species.vocabulary,
     triggers: species.triggers,
     remembers: `Remembers what a ${spec.species} like this would: food, fun, frights, and who was kind or unkind.`,
+    // Starts from the friendliness slider; the same slider sets how feelings move.
+    bond: { start: spec.friendliness * 2, style: BOND_STYLE[spec.friendliness] },
     ...(species.mimics ? { mimics: true as const } : {}),
     membersOnly: true,
   };

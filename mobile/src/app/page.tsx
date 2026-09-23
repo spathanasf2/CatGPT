@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { ANIMALS, animalById, type AnimalRef } from "@/lib/animals";
+import { ANIMALS, animalById, normalizeAnimalId, type AnimalRef } from "@/lib/animals";
 import { askAnimal, toHistory, ChatError, type ChatErrorKind, type HistoryItem } from "@/lib/chat";
 import {
   loadChats,
@@ -18,6 +18,16 @@ import { newId } from "@/lib/ids";
 import { grantConsent, loadConsent, revokeConsent } from "@/lib/consent";
 import { refreshMembership } from "@/lib/membership";
 import { forgetAnimal, memoriesFor, rememberFor } from "@/lib/memory";
+import { bondFor, bondNote, forgetBonds, setBond } from "@/lib/bond";
+import {
+  cancelNudge,
+  disableNudges,
+  enableNudges,
+  nudgesAvailable,
+  nudgesOn,
+  onNudgeTapped,
+  scheduleNudge,
+} from "@/lib/nudges";
 import { replyHaptic } from "@/lib/haptics";
 import { renderShareCard } from "@/lib/share-card";
 import { sharePng } from "@/lib/share";
@@ -58,6 +68,12 @@ function ensureDraft(list: Chat[]): { chats: Chat[]; activeId: string } {
   }
   const chat = newChat(DEFAULT_ANIMAL);
   return { chats: [chat, ...list], activeId: chat.id };
+}
+
+// The animal of the most recent chat you actually said something in (chats are most-recent-first).
+function lastTalkedTo(chats: Chat[]): AnimalRef | null {
+  const chat = chats.find((c) => c.messages.some((m) => m.role === "user"));
+  return chat ? chat.animal : null;
 }
 
 function formatDay(iso: string): string {
@@ -113,6 +129,10 @@ export default function Home() {
   // The animal being edited, "new" for a fresh one, or null when the editor is closed.
   const [editingAnimal, setEditingAnimal] = useState<CustomAnimal | "new" | null>(null);
   const [customAnimals, setCustomAnimals] = useState<CustomAnimal[]>([]);
+  const [nudges, setNudges] = useState(false);
+  // For listeners registered once (app backgrounding, notification taps) that need current chats.
+  const chatsRef = useRef<Chat[]>([]);
+  chatsRef.current = chats;
   // "ask" on first launch (or on a send without permission), "review" from Settings.
   const [consentMode, setConsentMode] = useState<"ask" | "review" | null>(null);
   const [consentedAt, setConsentedAt] = useState<string | null>(null);
@@ -133,6 +153,7 @@ export default function Home() {
     setActiveChatId(activeId);
     setConsentedAt(loadConsent());
     setCustomAnimals(loadCustomAnimals());
+    setNudges(nudgesOn());
     setHydrated(true);
   }, []);
 
@@ -151,6 +172,48 @@ export default function Home() {
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
+
+  // "Misses you" nudges: scheduled as the app goes to the background, from whoever you talked to
+  // last; cancelled when it comes back. Tapping one opens a chat with that animal.
+  useEffect(() => {
+    if (!nudgesAvailable()) return;
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        cancelNudge().catch(() => undefined);
+        return;
+      }
+      const last = lastTalkedTo(chatsRef.current);
+      if (last) scheduleNudge(animalById(last), memoriesFor(last)).catch(() => undefined);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    const stopTaps = onNudgeTapped((id) => {
+      const animal = normalizeAnimalId(id);
+      if (!animal) return;
+      const { chats: next, activeId } = ensureDraft(chatsRef.current);
+      setChats(next.map((c) => (c.id === activeId ? { ...c, animal } : c)));
+      setActiveChatId(activeId);
+    });
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      stopTaps();
+    };
+  }, []);
+
+  async function handleToggleNudges() {
+    if (nudges) {
+      await disableNudges();
+      setNudges(false);
+      return;
+    }
+    const granted = await enableNudges();
+    if (!granted) window.alert("Notifications for Aineko are turned off in iOS Settings.");
+    setNudges(granted);
+  }
+
+  function handlePreviewNudge() {
+    const last = lastTalkedTo(chatsRef.current) ?? DEFAULT_ANIMAL;
+    scheduleNudge(animalById(last), memoriesFor(last), new Date(Date.now() + 5_000), true).catch(() => undefined);
+  }
 
   // First launch: ask for AI permission as the boot screen clears (see ConsentModal).
   useEffect(() => {
@@ -316,7 +379,11 @@ export default function Home() {
     const animal = animalById(reply.animal);
     try {
       const png = await renderShareCard({ animal, sounds: reply.sounds, narrative: reply.narrative, said });
-      await sharePng(png, `aineko-${animal.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}.png`);
+      await sharePng(
+        png,
+        `aineko-${animal.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}.png`,
+        `${animal.name} on Aineko`,
+      );
     } catch (err) {
       console.warn("share failed or was cancelled", err);
     }
@@ -326,6 +393,7 @@ export default function Home() {
   function handleDeleteAnimal(animal: CustomAnimal) {
     deleteCustomAnimal(animal.id);
     forgetAnimal(animal.id);
+    forgetBonds(animal.id);
     setCustomAnimals(loadCustomAnimals());
     setChats((prev) => prev.map((c) => (c.animal === animal.id ? { ...c, animal: DEFAULT_ANIMAL } : c)));
   }
@@ -333,9 +401,12 @@ export default function Home() {
   async function requestReply(chatId: string, animal: AnimalRef, text: string, history: HistoryItem[]) {
     setPending((prev) => ({ ...prev, [chatId]: animal }));
     try {
-      const reply = await askAnimal(animal, text, history, memoriesFor(animal));
+      const before = bondFor(animal);
+      const reply = await askAnimal(animal, text, history, memoriesFor(animal), before);
       replyHaptic();
       if (reply.remember) rememberFor(animal, reply.remember);
+      if (reply.bond !== undefined) setBond(animal, reply.bond);
+      const note = reply.bond !== undefined ? bondNote(animalById(animal).name, before, reply.bond) : null;
       appendMessage(chatId, {
         id: newId(),
         role: "animal",
@@ -343,6 +414,7 @@ export default function Home() {
         sounds: reply.sounds,
         narrative: reply.narrative,
         ...(reply.remember ? { remembered: reply.remember } : {}),
+        ...(note ? { bondNote: note } : {}),
       });
     } catch (err) {
       appendMessage(chatId, errorMessage(err, animal));
@@ -491,6 +563,11 @@ export default function Home() {
                           {"\u{1F4AD}"} {speaker.name} will remember: {m.remembered}
                         </div>
                       )}
+                      {m.bondNote && (
+                        <div className={`bond-note${m.bondNote.warmer ? " warmer" : ""}`}>
+                          {m.bondNote.warmer ? "\u{1F49B}" : "\u{1F494}"} {m.bondNote.text}
+                        </div>
+                      )}
                       <button
                         className="share-btn"
                         aria-label={`Share ${speaker.name}'s reply`}
@@ -598,6 +675,9 @@ export default function Home() {
             setShowSettings(false);
             setShowYourAnimals(true);
           }}
+          nudges={nudgesAvailable() ? nudges : null}
+          onToggleNudges={handleToggleNudges}
+          onPreviewNudge={handlePreviewNudge}
         />
       )}
       {showUsage && (

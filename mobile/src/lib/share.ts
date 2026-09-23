@@ -7,16 +7,20 @@ import { Share } from "@capacitor/share";
  * share sheet takes a file, not bytes. Browser (tailnet demo): the Web Share API with a file if it
  * can, otherwise a plain download.
  */
-export async function sharePng(base64: string, filename: string): Promise<void> {
+// Where shared cards point: counts the tap server-side, then the App Store listing once it exists
+// (server/src/index.ts GET /get) -- so this can ship before the listing does.
+export const SHARE_LINK = "https://aineko.bromsg.com/get";
+
+export async function sharePng(base64: string, filename: string, text?: string): Promise<void> {
   if (Capacitor.isNativePlatform()) {
     const { uri } = await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Cache });
-    await Share.share({ files: [uri] });
+    await Share.share({ files: [uri], text, url: SHARE_LINK });
     return;
   }
   const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
   const file = new File([bytes], filename, { type: "image/png" });
   if (navigator.canShare?.({ files: [file] })) {
-    await navigator.share({ files: [file] });
+    await navigator.share({ files: [file], text, url: SHARE_LINK });
     return;
   }
   const url = URL.createObjectURL(file);

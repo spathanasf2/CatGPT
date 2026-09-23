@@ -882,3 +882,30 @@ own in the picker, and sharing.
   `cli-games-telegram-notify@` hook -- the message heading says "CLI-Games systemd failure"; the
   unit name and exit code say it's Aineko (10 = down, 11 = key cap, 12 = account credit). Same
   failure re-alerts every 6 hours at most. One test alert was sent on install.
+
+## Version 1.2 (built 2026-09-23): feelings, "misses you" nudges, share link
+TestFlight 1.2 (17) points at foundry (dark icon). Server support for feelings is in production
+already (inert until a 1.2 client sends `bond`). Git tags mark what each shipped build was built
+from (`1.1-16`, ...) -- check out the tag to rebuild an older version.
+- **Feelings / relationship arcs** (`server/src/bond.ts`, `mobile/src/lib/bond.ts`): each
+  character has a score toward the person, -10..10, stored on the device like memory. The app sends
+  it (`bond`, null = first meeting -> the character's start), the model returns how the exchange
+  moved it (-2..2, clamped server-side), the server hands back the new score. Per-character start
+  and style in `animals.ts` (`bond`): Koba starts 7 and forgives instantly, Mortimer starts -4 and
+  thaws agonizingly slowly, Gerald is purely bread-transactional, Kevin has none (null). Custom
+  animals start at friendliness x 2. Like memory, the feeling is also stated in a bracketed note
+  beside the message. Measured live: six kind messages took Mortimer -4 -> 0, then "bath" -> -2.
+  Five levels (hostile/wary/undecided/fond/devoted); crossing one puts a note under the reply
+  ("Mortimer is warming up to you" / "Koba is a little hurt"). Shown in the picker (species ·
+  level) and What they remember; Forget everything clears feelings too.
+- **"Let them miss you"** (`mobile/src/lib/nudges.ts`, `@capacitor/local-notifications` 7.0.7):
+  opt-in in Settings (asks iOS permission). One local notification, scheduled as the app goes to
+  the background -- first 6pm at least 44h out -- from whoever you last talked to, cancelled when
+  the app comes back. Lines are written per character (kid-safe), and 40% of the time it quotes
+  their latest memory ("Koba hasn't forgotten: ..."). Tapping opens a chat with that animal.
+  Settings has "Preview in 5 seconds". All on-device -- no server, no push service.
+- **Share link**: cards now go out with "<Name> on Aineko" and `https://aineko.bromsg.com/get`
+  (see the server batch above), and the card footer prints `aineko.bromsg.com` for when the image
+  travels alone.
+- Review notes for 1.2 should mention the optional notifications and that nothing leaves the
+  device for them.

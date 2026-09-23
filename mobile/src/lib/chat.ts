@@ -8,6 +8,8 @@ export type AnimalReply = {
   narrative: string;
   // Something this animal decided to hold onto -- stored by lib/memory.ts.
   remember?: string;
+  // How it feels about the person now (-10..10) -- stored by lib/bond.ts.
+  bond?: number;
 };
 
 export type HistoryItem =
@@ -72,6 +74,7 @@ export async function askAnimal(
   message: string,
   history: HistoryItem[],
   memory: string[],
+  bond: number | null,
   timeoutMs = 25_000,
 ): Promise<AnimalReply> {
   if (!serverConfigured()) throw new ChatError("unavailable", "Aineko server URL or token not configured");
@@ -83,7 +86,7 @@ export async function askAnimal(
       res = await fetch(`${SERVER_URL}/chat`, {
         method: "POST",
         headers: { ...apiHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ animal, message, history, memory, ...customBody(animal) }),
+        body: JSON.stringify({ animal, message, history, memory, bond, ...customBody(animal) }),
         signal: ctrl.signal,
       });
     } catch (err) {
@@ -95,6 +98,7 @@ export async function askAnimal(
           sounds?: unknown;
           narrative?: unknown;
           remember?: unknown;
+          bond?: unknown;
           error?: unknown;
           code?: unknown;
           tier?: unknown;
@@ -122,6 +126,7 @@ export async function askAnimal(
     }
     const reply: AnimalReply = { sounds: body.sounds, narrative: body.narrative };
     if (typeof body.remember === "string" && body.remember.trim()) reply.remember = body.remember.trim();
+    if (typeof body.bond === "number" && Number.isInteger(body.bond)) reply.bond = body.bond;
     return reply;
   } finally {
     clearTimeout(timer);

@@ -2,6 +2,7 @@
 
 import { ANIMALS, type AnimalRef } from "@/lib/animals";
 import { customMeta, type CustomAnimal } from "@/lib/custom-animals";
+import { allBonds, bondLevel } from "@/lib/bond";
 import { Avatar } from "./Avatar";
 
 export const CREATE_ANIMAL = "__create__";
@@ -19,11 +20,15 @@ type Props = {
 // one without a membership opens Membership, same as before.
 export function AnimalPicker({ current, customAnimals, onPick, onClose }: Props) {
   const mine = customAnimals.filter((a) => !a.deleted).map(customMeta);
+  const bonds = allBonds();
   const tile = (a: (typeof ANIMALS)[number]) => (
     <button key={a.id} className={`pick-tile${a.id === current ? " on" : ""}`} style={{ ["--accent" as string]: a.accent }} onClick={() => onPick(a.id)}>
       <Avatar animal={a} size={56} />
       <span className="pick-name">{a.name}</span>
-      <span className="pick-species">{a.species}</span>
+      <span className="pick-species">
+        {a.species}
+        {bonds[a.id] !== undefined ? ` \u00b7 ${bondLevel(bonds[a.id]!)}` : ""}
+      </span>
     </button>
   );
 
