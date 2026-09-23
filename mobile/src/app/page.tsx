@@ -18,13 +18,10 @@ import { newId } from "@/lib/ids";
 import { grantConsent, loadConsent, revokeConsent } from "@/lib/consent";
 import { refreshMembership } from "@/lib/membership";
 import { forgetAnimal, memoriesFor, rememberFor } from "@/lib/memory";
-import {
-  deleteCustomAnimal,
-  loadCustomAnimals,
-  saveCustomAnimal,
-  speciesOption,
-  type CustomAnimal,
-} from "@/lib/custom-animals";
+import { replyHaptic } from "@/lib/haptics";
+import { renderShareCard } from "@/lib/share-card";
+import { sharePng } from "@/lib/share";
+import { deleteCustomAnimal, loadCustomAnimals, saveCustomAnimal, type CustomAnimal } from "@/lib/custom-animals";
 import { Sidebar } from "@/components/Sidebar";
 import { SettingsModal } from "@/components/SettingsModal";
 import { UsageModal } from "@/components/UsageModal";
@@ -34,9 +31,8 @@ import { ConsentModal } from "@/components/ConsentModal";
 import { MemoriesModal } from "@/components/MemoriesModal";
 import { CreateAnimalModal } from "@/components/CreateAnimalModal";
 import { YourAnimalsModal } from "@/components/YourAnimalsModal";
-
-// Value of the picker's "Make your own..." entry -- opens the editor instead of switching animals.
-const CREATE_ANIMAL = "__create__";
+import { AnimalPicker, CREATE_ANIMAL } from "@/components/AnimalPicker";
+import { Avatar } from "@/components/Avatar";
 
 const DEFAULT_ANIMAL: AnimalRef = ANIMALS[0]!.id;
 
@@ -113,6 +109,7 @@ export default function Home() {
   const [showMembership, setShowMembership] = useState(false);
   const [showMemories, setShowMemories] = useState(false);
   const [showYourAnimals, setShowYourAnimals] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
   // The animal being edited, "new" for a fresh one, or null when the editor is closed.
   const [editingAnimal, setEditingAnimal] = useState<CustomAnimal | "new" | null>(null);
   const [customAnimals, setCustomAnimals] = useState<CustomAnimal[]>([]);
@@ -272,6 +269,7 @@ export default function Home() {
   }
 
   function handleAnimalPick(animal: AnimalRef | typeof CREATE_ANIMAL) {
+    setShowPicker(false);
     if (animal === CREATE_ANIMAL) {
       if (member) setEditingAnimal("new");
       else setShowMembership(true);
@@ -301,6 +299,29 @@ export default function Home() {
     if (isNew) focusComposerNow();
   }
 
+  // A reply as an image card for the share sheet, with the message it was answering. Cancelling the
+  // share sheet rejects too, so failures here are logged and otherwise ignored.
+  async function handleShare(messageIndex: number) {
+    if (!activeChat) return;
+    const reply = activeChat.messages[messageIndex];
+    if (reply?.role !== "animal") return;
+    let said: string | undefined;
+    for (let i = messageIndex - 1; i >= 0; i--) {
+      const m = activeChat.messages[i]!;
+      if (m.role === "user") {
+        said = m.text;
+        break;
+      }
+    }
+    const animal = animalById(reply.animal);
+    try {
+      const png = await renderShareCard({ animal, sounds: reply.sounds, narrative: reply.narrative, said });
+      await sharePng(png, `aineko-${animal.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}.png`);
+    } catch (err) {
+      console.warn("share failed or was cancelled", err);
+    }
+  }
+
   // Soft delete: past messages from it still render. Chats pointed at it fall back to the default.
   function handleDeleteAnimal(animal: CustomAnimal) {
     deleteCustomAnimal(animal.id);
@@ -313,6 +334,7 @@ export default function Home() {
     setPending((prev) => ({ ...prev, [chatId]: animal }));
     try {
       const reply = await askAnimal(animal, text, history, memoriesFor(animal));
+      replyHaptic();
       if (reply.remember) rememberFor(animal, reply.remember);
       appendMessage(chatId, {
         id: newId(),
@@ -405,37 +427,14 @@ export default function Home() {
           <button className="hamburger" onClick={() => setSidebarOpen(true)} aria-label="Open sidebar">
             &#9776;
           </button>
-          {activeChat ? (
-            <select
-              className="animal-select"
-              value={activeChat.animal}
-              onChange={(e) => handleAnimalPick(e.target.value as AnimalRef | typeof CREATE_ANIMAL)}
-            >
-              {ANIMALS.filter((a) => !a.membersOnly).map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.emoji} {a.name}
-                </option>
-              ))}
-              {/* Bonus animals grouped under their own header (a section break in iOS's native
-                  picker) rather than individually badged -- Frank: clear what's new, not "special". */}
-              <optgroup label="Members only">
-                {ANIMALS.filter((a) => a.membersOnly).map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.emoji} {a.name}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Your animals">
-                {customAnimals
-                  .filter((a) => !a.deleted)
-                  .map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {speciesOption(a.species).emoji} {a.name}
-                    </option>
-                  ))}
-                <option value={CREATE_ANIMAL}>{"\uFF0B"} Make your own...</option>
-              </optgroup>
-            </select>
+          {activeChat && currentAnimal ? (
+            <button className="animal-button" onClick={() => setShowPicker(true)} aria-label="Choose an animal">
+              <Avatar animal={currentAnimal} size={28} />
+              <span>{currentAnimal.name}</span>
+              <span className="animal-button-chevron" aria-hidden>
+                {"\u25BE"}
+              </span>
+            </button>
           ) : (
             <span className="topbar-title">Aineko</span>
           )}
@@ -483,25 +482,41 @@ export default function Home() {
                 const speaker = animalById(m.animal);
                 return (
                   <div key={m.id} className="row animal">
+                    <Avatar animal={speaker} size={30} className="row-avatar" />
                     <div className="bubble animal" style={{ ["--accent" as string]: speaker.accent }}>
-                      <div className="sounds">
-                        {speaker.emoji} {m.sounds}
-                      </div>
+                      <div className="sounds">{m.sounds}</div>
                       <div className="narrative">{m.narrative}</div>
                       {m.remembered && (
                         <div className="remembered">
                           {"\u{1F4AD}"} {speaker.name} will remember: {m.remembered}
                         </div>
                       )}
+                      <button
+                        className="share-btn"
+                        aria-label={`Share ${speaker.name}'s reply`}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => handleShare(i)}
+                      >
+                        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden>
+                          <path
+                            d="M12 3v12M7.5 7.5 12 3l4.5 4.5M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
                     </div>
                   </div>
                 );
               })}
               {activePending && (
                 <div className="row animal">
+                  <Avatar animal={animalById(activePending)} size={30} className="row-avatar" />
                   <div className="bubble animal" style={{ ["--accent" as string]: animalById(activePending).accent }}>
                     <div className="thinking">
-                      <span>{animalById(activePending).emoji}</span>
                       <span>{animalById(activePending).thinking}</span>
                       <span className="dots">
                         <span />
@@ -607,6 +622,14 @@ export default function Home() {
             setShowMembership(true);
           }}
           onClose={() => setShowYourAnimals(false)}
+        />
+      )}
+      {showPicker && activeChat && (
+        <AnimalPicker
+          current={activeChat.animal}
+          customAnimals={customAnimals}
+          onPick={handleAnimalPick}
+          onClose={() => setShowPicker(false)}
         />
       )}
       {editingAnimal && (

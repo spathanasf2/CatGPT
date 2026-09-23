@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ANIMALS, animalById, type AnimalRef } from "@/lib/animals";
 import { customById, isCustomId } from "@/lib/custom-animals";
 import { allMemories, forgetAll, MEMORY_LIMIT } from "@/lib/memory";
+import { Avatar } from "./Avatar";
 
 type Props = {
   onClose: () => void;
@@ -30,8 +31,8 @@ export function MemoriesModal({ onClose }: Props) {
           <div className="memory-scroll">
             {withNotes.map((a) => (
               <div key={a.id} className="memory-group">
-                <p className="modal-row-label">
-                  {a.emoji} {a.name}
+                <p className="modal-row-label memory-who">
+                  <Avatar animal={a} size={20} /> {a.name}
                 </p>
                 <ul className="memory-list">
                   {memories[a.id]!.map((n) => (

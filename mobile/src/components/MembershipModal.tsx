@@ -13,6 +13,7 @@ import {
   type MembershipProduct,
 } from "@/lib/membership";
 import { ANIMALS } from "@/lib/animals";
+import { Avatar } from "./Avatar";
 
 type Props = {
   onClose: () => void;
@@ -26,7 +27,12 @@ function Perks() {
   return (
     <ul className="perk-list">
       <li>
-        {BONUS.map((a) => a.emoji).join(" ")} Bonus animals: {BONUS.map((a) => `${a.name} the ${a.species}`).join(", ")}
+        Bonus animals: {BONUS.map((a) => `${a.name} the ${a.species}`).join(", ")}
+        <span className="perk-avatars">
+          {BONUS.map((a) => (
+            <Avatar key={a.id} animal={a} size={30} />
+          ))}
+        </span>
       </li>
       <li>Make your own animals: pick the species, name, and personality</li>
       <li>About 10&times; the free chat allowance</li>

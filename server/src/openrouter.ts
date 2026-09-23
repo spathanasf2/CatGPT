@@ -156,7 +156,10 @@ function parseReply(
   const reply: AnimalReply = { sounds: kidSafe(sounds), narrative: kidSafe(narrative) || `*${who(animal, legacy)} looks at you.*` };
   // Only kept when asked for, from a character that has a memory at all (not Kevin).
   const remember = typeof obj.remember === "string" ? obj.remember.trim() : "";
-  if (wantsMemory && animal.remembers && remember && remember.toLowerCase() !== "null" && !isKnownNote(remember, memory, animal.name)) {
+  // Under three words ("walk", "plastic bag") isn't a memory, it's a keyword -- the model does this
+  // despite being asked for a full phrase.
+  const substantial = remember.split(/\s+/).filter(Boolean).length >= 3;
+  if (wantsMemory && animal.remembers && substantial && remember.toLowerCase() !== "null" && !isKnownNote(remember, memory, animal.name)) {
     reply.remember = kidSafe(remember.slice(0, 120));
   }
   return reply;

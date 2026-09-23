@@ -52,3 +52,10 @@ test("builds the personality only from our own text", () => {
   assert.equal(calm.description, "an unflappable cat");
   assert.equal(customAnimal(parseCustom({ ...base, species: "parrot" })!).mimics, true);
 });
+
+test("the picked look becomes the noun", () => {
+  assert.equal(customAnimal(parseCustom({ ...base, look: "golden", energy: 2 })!).description, "a hyper golden retriever");
+  assert.equal(customAnimal(parseCustom({ ...base, species: "parrot", look: "african-grey" })!).description, "an African grey parrot");
+  assert.equal(parseCustom({ ...base, look: "unicorn" })?.look, undefined); // unknown look: ignored, spec still valid
+  assert.equal(parseCustom({ ...base, species: "cat", look: "golden" })?.look, undefined); // wrong species' look
+});

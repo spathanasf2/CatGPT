@@ -201,16 +201,37 @@ select {
   font-size: 16px;
 }
 
-.animal-select {
+/* Who you're talking to: opens the picker sheet (replaced a native <select>, which can't show art). */
+.animal-button {
   margin-left: auto;
-  max-width: 60vw;
-  padding: 7px 10px;
-  border-radius: 10px;
+  max-width: 62vw;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 12px 3px 3px;
+  border-radius: 999px;
   border: 1.5px solid var(--accent);
   background: #1c1c26;
   color: #f2f0f5;
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 600;
+}
+
+.animal-button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.animal-button-chevron {
+  color: #8b8894;
+  font-size: 12px;
+}
+
+.avatar {
+  display: block;
+  flex-shrink: 0;
+  border-radius: 50%;
 }
 
 .empty-state {
@@ -249,6 +270,12 @@ select {
 
 .row.animal {
   justify-content: flex-start;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.row-avatar {
+  margin-bottom: 2px;
 }
 
 .starter-chips {
@@ -289,9 +316,30 @@ select {
 }
 
 .bubble.animal {
+  position: relative;
   background: #1c1c26;
   border: 1.5px solid var(--accent);
   border-bottom-left-radius: 4px;
+}
+
+/* Room for the share button in the bubble's top-right corner. */
+.bubble.animal .sounds {
+  padding-right: 24px;
+}
+
+.share-btn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #6f6c78;
 }
 
 .bubble.error {
@@ -824,4 +872,120 @@ select {
 
 .link-btn.danger {
   color: #e3a5ab;
+}
+
+/* Picker sheet. */
+.picker-scroll {
+  max-height: calc(var(--app-height, 100dvh) - 140px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.pick-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.pick-tile {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 2px 6px;
+  border-radius: 14px;
+  border: 1.5px solid transparent;
+  background: transparent;
+  color: #f2f0f5;
+}
+
+.pick-tile.on {
+  border-color: var(--accent);
+  background: #232330;
+}
+
+.pick-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.pick-tile.make .pick-name {
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.pick-species {
+  font-size: 10.5px;
+  color: #8b8894;
+}
+
+/* The thin divider above "Members only" (and "Your animals"). */
+.pick-section {
+  margin: 8px 0 6px;
+  padding-top: 10px;
+  border-top: 1px solid #26262f;
+  font-size: 12px;
+  color: #8b8894;
+}
+
+.pick-plus {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1.5px dashed #4a4a58;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  color: #a29fac;
+}
+
+.perk-avatars {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.memory-who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.species-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+.species-btn .avatar {
+  width: 100%;
+  height: auto;
+}
+
+.look-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.look-btn {
+  padding: 2px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: transparent;
+}
+
+.look-btn.on {
+  border-color: var(--accent);
 }

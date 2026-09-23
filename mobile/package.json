@@ -11,10 +11,13 @@
   },
   "dependencies": {
     "@capacitor/core": "7.6.4",
+    "@capacitor/filesystem": "7.1.8",
+    "@capacitor/haptics": "7.0.5",
     "@capacitor/keyboard": "7.0.3",
+    "@capacitor/share": "7.0.4",
     "@capacitor/splash-screen": "7.0.5",
-    "@capgo/native-purchases": "7.19.3",
     "@capacitor/status-bar": "7.0.6",
+    "@capgo/native-purchases": "7.19.3",
     "next": "15.5.18",
     "react": "19.1.0",
     "react-dom": "19.1.0"

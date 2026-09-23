@@ -1,10 +1,11 @@
 import type { AnimalMeta } from "./animals";
+import { defaultLook, type Species } from "./avatars";
 import { randomHex } from "./ids";
 
 // Animals people make (members). Stored on the device, like chats; every request to one carries
 // its full spec, and the server writes the prompt from it (server/src/custom.ts) -- so the ids,
 // quirks and name rule here must match that file.
-export type SpeciesId = "cat" | "dog" | "cow" | "duck" | "parrot" | "fish" | "horse" | "goat" | "snake";
+export type SpeciesId = Species;
 export type Level = -2 | -1 | 0 | 1 | 2;
 export type CustomId = `custom-${string}`;
 export type SliderKey = "energy" | "friendliness" | "appetite" | "drama";
@@ -15,6 +16,9 @@ export type CustomAnimal = {
   species: SpeciesId;
   pronoun: "she" | "he" | "it";
   quirks: string[];
+  // Portrait look (lib/avatars.ts LOOKS[species]); also the noun the server uses ("golden retriever").
+  // Absent on animals made in builds 1.0 (13)-(14): they get their species' first look.
+  look?: string;
   accent: string;
   createdAt: number;
   // Soft delete: chats that talked to it still need its name and emoji to render.
@@ -113,11 +117,22 @@ export function speciesOption(id: SpeciesId) {
 
 export function customMeta(a: CustomAnimal): AnimalMeta {
   const s = speciesOption(a.species);
-  return { id: a.id, name: a.name, species: a.species, emoji: s.emoji, accent: a.accent, thinking: "thinking it over", membersOnly: true, custom: true };
+  return {
+    id: a.id,
+    name: a.name,
+    species: a.species,
+    kind: a.species,
+    look: a.look ?? defaultLook(a.species),
+    emoji: s.emoji,
+    accent: a.accent,
+    thinking: "thinking it over",
+    membersOnly: true,
+    custom: true,
+  };
 }
 
 // Exactly what POST /chat's `custom` field expects (server/src/custom.ts parseCustom).
 export function customSpec(a: CustomAnimal) {
-  const { id, name, species, pronoun, quirks, energy, friendliness, appetite, drama } = a;
-  return { id, name, species, pronoun, quirks, energy, friendliness, appetite, drama };
+  const { id, name, species, pronoun, quirks, energy, friendliness, appetite, drama, look } = a;
+  return { id, name, species, pronoun, quirks, energy, friendliness, appetite, drama, ...(look ? { look } : {}) };
 }

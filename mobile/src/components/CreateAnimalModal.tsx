@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { LOOKS, defaultLook, lookLabel } from "@/lib/avatars";
+import { Avatar } from "./Avatar";
 import {
   MAX_QUIRKS,
   NAME_PATTERN,
@@ -26,8 +28,12 @@ type Props = {
 // turns these into the personality (server/src/custom.ts), so nothing typed here but the name
 // ever reaches the model.
 export function CreateAnimalModal({ initial, onSave, onClose }: Props) {
+  // Fixed up front so the portraits preview in the color the animal will actually get.
+  const [id] = useState(() => initial?.id ?? newCustomId());
+  const accent = initial?.accent ?? pickAccent(id);
   const [name, setName] = useState(initial?.name ?? "");
   const [species, setSpecies] = useState<SpeciesId>(initial?.species ?? "dog");
+  const [look, setLook] = useState<string>(initial?.look ?? defaultLook(initial?.species ?? "dog"));
   const [pronoun, setPronoun] = useState<CustomAnimal["pronoun"]>(initial?.pronoun ?? "she");
   const [levels, setLevels] = useState<Record<SliderKey, Level>>({
     energy: initial?.energy ?? 0,
@@ -45,24 +51,28 @@ export function CreateAnimalModal({ initial, onSave, onClose }: Props) {
 
   function save() {
     if (!nameOk) return;
-    const id = initial?.id ?? newCustomId();
     onSave({
       id,
       name: trimmed,
       species,
+      look,
       pronoun,
       quirks,
       ...levels,
-      accent: initial?.accent ?? pickAccent(id),
+      accent,
       createdAt: initial?.createdAt ?? Date.now(),
     });
   }
 
   const speciesLabel = SPECIES_OPTIONS.find((o) => o.id === species)?.label;
+  function pickSpecies(next: SpeciesId) {
+    setSpecies(next);
+    if (next !== species) setLook(defaultLook(next));
+  }
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal create-animal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal create-animal" style={{ ["--accent" as string]: accent }} onClick={(e) => e.stopPropagation()}>
         <h2>{initial ? `Edit ${initial.name}` : "Make an animal"}</h2>
         {/* Sized to fit a phone screen without scrolling; scrolls vertically only as a fallback
             (small phones, keyboard up). Sideways is locked: iOS otherwise let the sheet drift
@@ -88,9 +98,25 @@ export function CreateAnimalModal({ initial, onSave, onClose }: Props) {
                 key={o.id}
                 className={`species-btn${species === o.id ? " on" : ""}`}
                 aria-label={o.label}
-                onClick={() => setSpecies(o.id)}
+                onClick={() => pickSpecies(o.id)}
               >
-                {o.emoji}
+                <Avatar animal={{ kind: o.id, look: defaultLook(o.id), accent }} size={30} />
+              </button>
+            ))}
+          </div>
+
+          <p className="create-label">
+            Look <span className="create-value">{lookLabel(species, look)}</span>
+          </p>
+          <div className="look-row">
+            {LOOKS[species].map((l) => (
+              <button
+                key={l.id}
+                className={`look-btn${look === l.id ? " on" : ""}`}
+                aria-label={l.label}
+                onClick={() => setLook(l.id)}
+              >
+                <Avatar animal={{ kind: species, look: l.id, accent }} size={44} />
               </button>
             ))}
           </div>

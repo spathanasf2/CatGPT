@@ -20,6 +20,20 @@ export const SPECIES: Record<SpeciesId, Species> = {
   snake: { vocabulary: ["Hsss", "Sssss", "HSSSSSS", "*flick flick*"], triggers: ["mouse", "warm", "heat", "sun", "egg"] },
 };
 
+// The look someone picked for their animal (the portrait in mobile/src/lib/avatars.ts -- keep the ids
+// in sync), as the noun the prompt uses: a custom golden should know it's a golden retriever.
+export const LOOK_NOUNS: Record<SpeciesId, Record<string, string>> = {
+  cat: { "gray-tabby": "gray tabby cat", "orange-tabby": "orange tabby cat", black: "black cat", tuxedo: "tuxedo cat", calico: "calico cat" },
+  dog: { boxer: "boxer", golden: "golden retriever", lab: "black Labrador", chihuahua: "chihuahua", mutt: "mutt" },
+  cow: { holstein: "Holstein cow", jersey: "Jersey cow", highland: "Highland cow" },
+  duck: { mallard: "mallard duck", white: "white duck", brown: "brown duck" },
+  parrot: { "african-grey": "African grey parrot", macaw: "scarlet macaw", cockatiel: "cockatiel" },
+  fish: { goldfish: "goldfish", tang: "blue tang", betta: "betta fish" },
+  horse: { bay: "bay horse", chestnut: "chestnut horse", gray: "dapple gray horse", palomino: "palomino horse", black: "black horse" },
+  goat: { white: "white goat", brown: "brown goat", blackwhite: "black-and-white goat" },
+  snake: { corn: "corn snake", green: "green snake", black: "black snake", striped: "garter snake" },
+};
+
 type Level = -2 | -1 | 0 | 1 | 2;
 const SLIDERS = ["energy", "friendliness", "appetite", "drama"] as const;
 type Slider = (typeof SLIDERS)[number];
@@ -81,6 +95,8 @@ export type CustomSpec = {
   species: SpeciesId;
   pronoun: "she" | "he" | "it";
   quirks: string[];
+  // Optional: builds 1.0 (13)-(14) don't send one; unknown looks are ignored rather than rejected.
+  look?: string;
 } & Record<Slider, Level>;
 
 export const CUSTOM_ID = /^custom-[a-f0-9]{16}$/;
@@ -101,10 +117,13 @@ export function parseCustom(raw: unknown): CustomSpec | null {
   const quirks = r.quirks ?? [];
   if (!Array.isArray(quirks) || quirks.length > MAX_QUIRKS) return null;
   if (!quirks.every((q) => typeof q === "string" && Object.prototype.hasOwnProperty.call(QUIRKS, q))) return null;
+  const species = r.species as SpeciesId;
+  const look = typeof r.look === "string" && Object.prototype.hasOwnProperty.call(LOOK_NOUNS[species], r.look) ? r.look : undefined;
   return {
     id: r.id,
     name: r.name.trim(),
-    species: r.species as SpeciesId,
+    species,
+    ...(look ? { look } : {}),
     pronoun: r.pronoun,
     quirks: [...new Set(quirks as string[])],
     energy: r.energy as Level,
@@ -123,12 +142,13 @@ export function customAnimal(spec: CustomSpec): Animal {
   );
   const personality = [...traits, ...quirks].join(" ") || `A thoroughly ordinary ${spec.species} in every respect.`;
   const [first, second] = adjectives;
-  const phrase = second ? `${first}, ${second} ${spec.species}` : first ? `${first} ${spec.species}` : spec.species;
+  const noun = (spec.look && LOOK_NOUNS[spec.species][spec.look]) || spec.species;
+  const phrase = second ? `${first}, ${second} ${noun}` : first ? `${first} ${noun}` : noun;
   return {
     id: spec.id,
     name: spec.name,
     species: spec.species,
-    description: `${/^[aeiou]/.test(phrase) ? "an" : "a"} ${phrase}`,
+    description: `${/^[aeiou]/i.test(phrase) ? "an" : "a"} ${phrase}`,
     pronoun: spec.pronoun,
     personality,
     vocabulary: species.vocabulary,

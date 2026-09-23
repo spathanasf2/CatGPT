@@ -1,6 +1,7 @@
 "use client";
 
-import { speciesOption, type CustomAnimal } from "@/lib/custom-animals";
+import { customMeta, type CustomAnimal } from "@/lib/custom-animals";
+import { Avatar } from "./Avatar";
 
 type Props = {
   animals: CustomAnimal[];
@@ -24,9 +25,8 @@ export function YourAnimalsModal({ animals, member, onCreate, onEdit, onDelete, 
         )}
         {live.map((a) => (
           <div key={a.id} className="your-animal">
-            <span className="your-animal-name">
-              {speciesOption(a.species).emoji} {a.name}
-            </span>
+            <Avatar animal={customMeta(a)} size={30} />
+            <span className="your-animal-name">{a.name}</span>
             <button className="link-btn" onClick={() => onEdit(a)}>
               Edit
             </button>

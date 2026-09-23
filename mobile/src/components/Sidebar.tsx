@@ -1,6 +1,7 @@
 "use client";
 
 import { animalById } from "@/lib/animals";
+import { Avatar } from "./Avatar";
 import type { Chat } from "@/lib/chats";
 
 type Props = {
@@ -41,7 +42,7 @@ export function Sidebar({
             return (
               <div key={c.id} className={`chat-item${c.id === activeChatId ? " active" : ""}`}>
                 <button className="chat-item-main" onClick={() => onSelectChat(c.id)}>
-                  <span className="chat-item-emoji">{meta.emoji}</span>
+                  <Avatar animal={meta} size={22} />
                   <span className="chat-item-title">{c.title}</span>
                 </button>
                 <button
