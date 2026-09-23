@@ -17,7 +17,7 @@ import { useViewportHeight } from "@/lib/use-viewport-height";
 import { newId } from "@/lib/ids";
 import { grantConsent, loadConsent, revokeConsent } from "@/lib/consent";
 import { refreshMembership } from "@/lib/membership";
-import { memoriesFor, rememberFor } from "@/lib/memory";
+import { forgetAnimal, memoriesFor, rememberFor } from "@/lib/memory";
 import {
   deleteCustomAnimal,
   loadCustomAnimals,
@@ -304,6 +304,7 @@ export default function Home() {
   // Soft delete: past messages from it still render. Chats pointed at it fall back to the default.
   function handleDeleteAnimal(animal: CustomAnimal) {
     deleteCustomAnimal(animal.id);
+    forgetAnimal(animal.id);
     setCustomAnimals(loadCustomAnimals());
     setChats((prev) => prev.map((c) => (c.animal === animal.id ? { ...c, animal: DEFAULT_ANIMAL } : c)));
   }

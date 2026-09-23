@@ -669,35 +669,89 @@ select {
   }
 }
 
-/* Make-an-animal editor. */
-.create-scroll {
-  max-height: 58vh;
+/* Make-an-animal editor. Fits a phone screen without scrolling; never scrolls sideways. */
+.create-animal {
+  overflow-x: hidden;
+  touch-action: pan-y;
+}
+
+.create-body {
+  max-height: calc(var(--app-height, 100dvh) - 150px);
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding: 0 2px; /* room for slider knobs at the ends */
   margin-bottom: 12px;
 }
 
 .create-name {
   width: 100%;
-  padding: 10px 12px;
+  padding: 9px 12px;
   border-radius: 10px;
   border: 1px solid #26262f;
   background: #12121a;
   color: #f2f0f5;
   font-size: 16px; /* 16px+ keeps iOS from zooming the page on focus */
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .create-hint {
   color: #e3a5ab;
   font-size: 12px;
-  margin: -6px 0 10px;
+  margin: -4px 0 8px;
+}
+
+.create-label {
+  margin: 0 0 5px;
+  font-size: 12px;
+  color: #8b8894;
+}
+
+.create-value {
+  color: #f2f0f5;
+  margin-left: 4px;
+}
+
+.create-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.create-inline .create-label,
+.create-inline .chip-row {
+  margin: 0;
+}
+
+.species-row {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.species-btn {
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid #26262f;
+  background: transparent;
+  font-size: 19px;
+}
+
+.species-btn.on {
+  border-color: var(--accent);
+  background: #232330;
 }
 
 .chip-row {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .chip {
@@ -707,6 +761,11 @@ select {
   background: transparent;
   color: #cfcdd6;
   font-size: 13px;
+}
+
+.chip-row.compact .chip {
+  padding: 4px 9px;
+  font-size: 12.5px;
 }
 
 .chip.on {
@@ -720,23 +779,24 @@ select {
 }
 
 .slider {
-  margin-bottom: 12px;
+  margin-bottom: 6px;
 }
 
 .slider input[type="range"] {
+  display: block;
   width: 100%;
+  margin: 0;
   accent-color: var(--accent);
 }
 
-.slider-value {
-  color: #f2f0f5;
+.create-actions {
+  display: flex;
+  gap: 10px;
 }
 
-.slider-ends {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: #6f6c78;
+.create-actions button {
+  flex: 1;
+  margin: 0;
 }
 
 /* Settings > Your animals rows. */

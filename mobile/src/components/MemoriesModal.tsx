@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ANIMALS } from "@/lib/animals";
+import { ANIMALS, animalById, type AnimalRef } from "@/lib/animals";
+import { customById, isCustomId } from "@/lib/custom-animals";
 import { allMemories, forgetAll, MEMORY_LIMIT } from "@/lib/memory";
 
 type Props = {
@@ -12,7 +13,12 @@ type Props = {
 // way to wipe them. Transparency for something that shapes replies, and half the fun is reading it.
 export function MemoriesModal({ onClose }: Props) {
   const [memories, setMemories] = useState(() => allMemories());
-  const withNotes = ANIMALS.filter((a) => memories[a.id]?.length);
+  // Built-ins in roster order, then the person's own animals (skipping deleted ones). This used to
+  // list ANIMALS only, so custom animals' notes were saved but never shown.
+  const ids = Object.keys(memories).filter((id) => memories[id as AnimalRef]?.length) as AnimalRef[];
+  const builtIn = ANIMALS.filter((a) => ids.includes(a.id)).map((a) => a.id);
+  const custom = ids.filter((id) => isCustomId(id) && customById(id) && !customById(id)!.deleted);
+  const withNotes = [...builtIn, ...custom].map((id) => animalById(id));
 
   return (
     <div className="modal-backdrop" onClick={onClose}>

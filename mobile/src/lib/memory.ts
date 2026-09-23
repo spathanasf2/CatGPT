@@ -47,3 +47,10 @@ export function rememberFor(animal: AnimalRef, text: string): void {
 export function forgetAll(): void {
   save({});
 }
+
+// When a custom animal is deleted, what it remembered goes with it.
+export function forgetAnimal(animal: AnimalRef): void {
+  const memories = load();
+  delete memories[animal];
+  save(memories);
+}

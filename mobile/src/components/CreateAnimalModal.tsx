@@ -58,62 +58,75 @@ export function CreateAnimalModal({ initial, onSave, onClose }: Props) {
     });
   }
 
+  const speciesLabel = SPECIES_OPTIONS.find((o) => o.id === species)?.label;
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal create-animal" onClick={(e) => e.stopPropagation()}>
         <h2>{initial ? `Edit ${initial.name}` : "Make an animal"}</h2>
-        <div className="create-scroll">
-          <p className="modal-row-label">Name</p>
+        {/* Sized to fit a phone screen without scrolling; scrolls vertically only as a fallback
+            (small phones, keyboard up). Sideways is locked: iOS otherwise let the sheet drift
+            left/right, since slider knobs at the ends overhang the track slightly. */}
+        <div className="create-body">
           <input
             className="create-name"
             value={name}
             maxLength={20}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Biscuit"
+            placeholder="Name"
             autoCapitalize="words"
+            aria-label="Name"
           />
           {trimmed && !nameOk && <p className="create-hint">Letters, numbers, spaces, and &apos; . - only.</p>}
 
-          <p className="modal-row-label">Species</p>
-          <div className="chip-row">
-            {SPECIES_OPTIONS.map((s) => (
-              <button key={s.id} className={`chip${species === s.id ? " on" : ""}`} onClick={() => setSpecies(s.id)}>
-                {s.emoji} {s.label}
+          <p className="create-label">
+            Species <span className="create-value">{speciesLabel}</span>
+          </p>
+          <div className="species-row">
+            {SPECIES_OPTIONS.map((o) => (
+              <button
+                key={o.id}
+                className={`species-btn${species === o.id ? " on" : ""}`}
+                aria-label={o.label}
+                onClick={() => setSpecies(o.id)}
+              >
+                {o.emoji}
               </button>
             ))}
           </div>
 
-          <p className="modal-row-label">Pronoun</p>
-          <div className="chip-row">
-            {(["she", "he", "it"] as const).map((p) => (
-              <button key={p} className={`chip${pronoun === p ? " on" : ""}`} onClick={() => setPronoun(p)}>
-                {p}
-              </button>
-            ))}
+          <div className="create-inline">
+            <p className="create-label">Pronoun</p>
+            <div className="chip-row compact">
+              {(["she", "he", "it"] as const).map((pr) => (
+                <button key={pr} className={`chip${pronoun === pr ? " on" : ""}`} onClick={() => setPronoun(pr)}>
+                  {pr}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {SLIDERS.map((s) => (
-            <div key={s.key} className="slider">
-              <p className="modal-row-label">
-                {s.label}: <span className="slider-value">{s.steps[levels[s.key] + 2]}</span>
+          {SLIDERS.map((sl) => (
+            <div key={sl.key} className="slider">
+              <p className="create-label">
+                {sl.label} <span className="create-value">{sl.steps[levels[sl.key] + 2]}</span>
               </p>
               <input
                 type="range"
                 min={-2}
                 max={2}
                 step={1}
-                value={levels[s.key]}
-                onChange={(e) => setLevels((l) => ({ ...l, [s.key]: Number(e.target.value) as Level }))}
+                value={levels[sl.key]}
+                aria-label={sl.label}
+                onChange={(e) => setLevels((l) => ({ ...l, [sl.key]: Number(e.target.value) as Level }))}
               />
-              <div className="slider-ends">
-                <span>{s.steps[0]}</span>
-                <span>{s.steps[4]}</span>
-              </div>
             </div>
           ))}
 
-          <p className="modal-row-label">Quirks (up to {MAX_QUIRKS})</p>
-          <div className="chip-row">
+          <p className="create-label">
+            Quirks <span className="create-value">up to {MAX_QUIRKS}</span>
+          </p>
+          <div className="chip-row compact">
             {QUIRKS.map((q) => (
               <button
                 key={q.id}
@@ -126,12 +139,14 @@ export function CreateAnimalModal({ initial, onSave, onClose }: Props) {
             ))}
           </div>
         </div>
-        <button className="subscribe-btn" onClick={save} disabled={!nameOk}>
-          {initial ? "Save" : `Say hi to ${trimmed || "them"}`}
-        </button>
-        <button className="modal-close-btn" onClick={onClose}>
-          Cancel
-        </button>
+        <div className="create-actions">
+          <button className="modal-close-btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="subscribe-btn" onClick={save} disabled={!nameOk}>
+            {initial ? "Save" : `Say hi to ${trimmed || "them"}`}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -776,3 +776,13 @@ characters + memory + custom animals while build 12 is still in App Review again
 `.env.local` was switched to the tailnet values for it and switched back to production right after
 (production values saved at `~/aineko-build/env.local.production` on the Mac). The first build
 submitted with these features must be built against production after the Hetzner deploy.
+
+**Build 1.0 (14), same arrangement (TestFlight-only, foundry):** fixes from Frank's first look at
+13. (1) The editor sheet drifted sideways on iOS -- a vertical-only scroll area lets iOS pan
+horizontally too, and slider knobs at the ends overhang the track. Locked (`overflow-x: hidden`,
+`touch-action: pan-y`) and compacted to fit a phone without scrolling (measured: 375x667,
+390x844, 430x932 all fit, no overflow either way). (2) Settings > What they remember only iterated
+the built-in roster, so custom animals' notes were saved but never listed; now lists everything
+stored, and deleting a custom animal deletes its memories. Browser demo and the app keep
+separate memories (separate storage) -- a note made on the tailnet browser demo won't show in the
+app.
