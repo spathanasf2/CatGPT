@@ -699,7 +699,7 @@ Crude Humor" (sounds + a filtered, family-friendly stage direction). Expect 4+.
   `entitlement.ts` (the test suite covers the mechanics with a look-alike chain). If the horse
   stays locked after a sandbox purchase, check `docker logs aineko` and the header size first.
 
-## Characters, not species (2026-09-23) -- on foundry; production waits for build 12's review
+## Characters, not species (2026-09-23) -- live in production since the 1.1 deploy
 Animals are now named individuals: a **species** (`SpeciesId` -- what's physically real for it,
 e.g. which sounds) plus a **character** (`AnimalId` -- name, description, pronoun, personality,
 triggers). `server/src/animals.ts` holds the personalities; `mobile/src/lib/animals.ts` only what
@@ -748,7 +748,7 @@ a broken walk promise; Gerald keeps a bread ledger; Kevin remembers nothing, by 
 - **Cost:** up to ~12 short notes (~100-250 tokens) on top of history; allowances are token-
   denominated so worst-case dollars don't move, messages-per-allowance drop a bit.
 
-## Custom animals (2026-09-23, members) -- on foundry; TestFlight build 1.0 (13) points at foundry
+## Custom animals (2026-09-23, members) -- live in production since the 1.1 deploy
 Members make their own animals: species, name, she/he/it, four 5-step sliders (energy,
 friendliness, appetite, drama), up to two quirks from a fixed list. **No free-form prompt** (Frank
 agreed): the server writes every word from those choices (`server/src/custom.ts` -- slider
@@ -819,7 +819,7 @@ configs in project.pbxproj). The script names its output directory from both num
 
 ## Version 1.1 (2026-09-23): drawn animals, picker sheet, share cards, haptic
 Build 1.1 (15) went to TestFlight against foundry (dark icon) -- first build made with
-`ios-build.sh`. Everything below is on foundry; production gets it with the post-approval deploy.
+`ios-build.sh`. All of it is in production since the 1.1 deploy (below).
 - **Art in code** (`mobile/src/lib/avatars.ts`): flat 100x100 SVG portraits, one drawing function
   per species, 3-5 "looks" each (dog breeds: boxer/golden/lab/chihuahua/mutt; color patterns for
   the rest). Hayley (gray tabby, green eyes) and Koba (brown boxer, black mask, white chin) were
@@ -848,8 +848,12 @@ Build 1.1 (15) went to TestFlight against foundry (dark icon) -- first build mad
   memory lines hidden except Hayley's first). Run on the Mac in WebKit; it fakes membership in the
   test browser only (for the editor) the same way the UI tests do.
 
-**Shipping 1.1 once 1.0 is approved:** (1) deploy the server to Hetzner (rsync + compose build/up
-aineko) -- backward compatible with 1.0 builds via the legacy species-id mapping; (2) on the Mac,
-bump `CURRENT_PROJECT_VERSION` in the repo, rsync, `npm ci`, `ios-build.sh hetzner --upload`
-(light icon, production URL); (3) submit that build with the v1.1 screenshots and review notes
-that mention the new bonus roster, Make your own, and sharing.
+**Shipped to production 2026-09-23 (Frank: "hook it up to prod"; 1.0's review status wasn't known at the time).**
+Hetzner runs the 1.1 server (characters, memory, custom animals, looks). Backups beside it:
+`~/services/{docker-compose.yml.bak-aineko-1.1-*,aineko-src.bak-1.1-*.tgz,aineko-data.bak-1.1-*}`.
+Verified through Cloudflare with build-12-shaped requests: `cat` answers unnamed with no memory
+field, `horse` stays members-only, species-id history works -- so 1.0 under review (and anyone on
+it later) keeps working. **Build 1.1 (16)** is the white (light icon, production URL) submission
+build, made with `ios-build.sh hetzner --upload`. Screenshots: `app-store-6.5-v1.1/`. Review
+notes should mention the new bonus roster (Mortimer, Peanut, Tank, Barbara, Noodle), Make your
+own in the picker, and sharing.
