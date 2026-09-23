@@ -786,3 +786,33 @@ the built-in roster, so custom animals' notes were saved but never listed; now l
 stored, and deleting a custom animal deletes its memories. Browser demo and the app keep
 separate memories (separate storage) -- a note made on the tailnet browser demo won't show in the
 app.
+
+## Building for TestFlight: `mobile/scripts/ios-build.sh` (from 2026-09-23 on)
+Two servers feed the same TestFlight app, so **the icon says which one a build talks to** (Frank's
+call): **foundry = dark icon** (`AppIcon-Foundry`, the mark on the app's `#12121a`), **Hetzner /
+production = light icon** (`AppIcon`, the real one -- never edited for this). The script picks the
+server and the icon together from one argument, so they can't disagree:
+```
+# on foundry: bump CURRENT_PROJECT_VERSION in project.pbxproj, commit, then
+rsync -a --exclude node_modules --exclude .next --exclude out --exclude .env.local \
+  --exclude tsconfig.tsbuildinfo --exclude ios/App/Pods --exclude ios/App/App/public \
+  --exclude ios/App/build --exclude DerivedData --exclude xcuserdata \
+  --exclude ios/App/App/capacitor.config.json --exclude ios/App/App/config.xml \
+  --exclude ios/capacitor-cordova-ios-plugins mobile/ qoracle-mac:aineko/mobile/
+# on the Mac:
+zsh ~/aineko/mobile/scripts/ios-build.sh foundry --upload   # or: hetzner --upload
+```
+It builds the web bundle with that target's env (`~/aineko-build/env.local.foundry` /
+`env.local.production` on the Mac), refuses to continue unless the bundle points at the right
+server (a production build must not mention `ts.net` at all), archives with
+`ASSETCATALOG_COMPILER_APPICON_NAME` set to that target's icon, checks the archive's
+`CFBundleIconName`, then uploads to `~/aineko-build/<version>-<build>/` (refusing to reuse an
+existing build number). `.env.local` goes back to production on exit, failure included. Without
+`--upload` it does a dry run into `~/aineko-build/dry-run-<target>` -- both targets verified that
+way on 2026-09-23, and the compiled icons were pulled out of the archives and looked at
+(`xcrun pngcrush -revert-iphone-optimizations` decodes Xcode's CgBI PNGs). Builds 1-14 predate the
+script and all carry the light icon, including foundry-pointed 13 and 14.
+
+**Version numbers:** once 1.0 is approved and released, App Store Connect closes the 1.0 "train" --
+every later upload, TestFlight included, needs `MARKETING_VERSION` bumped (1.0.1 or 1.1, both
+configs in project.pbxproj). The script names its output directory from both numbers.
