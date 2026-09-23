@@ -930,6 +930,31 @@ sends `room`). Its own release because it's the biggest change to how a chat wor
   with N" / "Update room". Top bar shows the room's stacked portraits + "Room"; sidebar rows too.
   Picking one animal ends the room. Deleting a custom animal takes it out of any room (a room left
   with one animal becomes a normal chat).
-- Rooms are open to free users with the free animals -- a product call worth revisiting (a room
-  costs N x per message, and free allowances are token-based, so free users just run out N x
-  faster).
+- Rooms are open to free users with the free animals -- **Frank's call (2026-09-23): keep them open.**
+  A room costs N x per message; free allowances are token-based, so free users just run out N x
+  faster.
+
+## Notifications with a reason, and "Miaou" (2026-09-23; server live, app in 1.3 (19))
+Frank's rules for "Let them miss you" (supersede the simpler 1.2 behavior; `mobile/src/lib/nudges.ts`):
+only after they haven't opened the app in a while, at most once a day -- 6pm on day 2, day 4 and
+day 7 after leaving, then stop -- only from their 1-2 most-talked-to animals (by replies, deleted
+customs skipped), alternating; each line pegged to something real when possible. Opening the app
+cancels all of them.
+- **Promises** (`server/src/openrouter.ts` promise/kept fields, `mobile/src/lib/promises.ts`): the
+  model flags when the person promises an animal something it cares about ("a walk after dinner" --
+  prompted as a noun phrase that fits "X is still waiting for ___") and when a later message
+  delivers it (`kept`, which overrides a restated promise). The app keeps one open promise per
+  animal (stale after 7 days) and sends it with requests. Measured: kept detected 4/5, no false
+  positives; new promises came out as proper noun phrases. An open promise leads the first nudge:
+  "Koba is still waiting for a walk after dinner. He's by the door." Opt-in by sending `promise`
+  (null = none), so older builds never see the fields.
+- **Lines**: per character, 3 "ignored" + 2-3 "promise" lines in their voice (Kevin's promise
+  line: "Kevin has already forgotten {promise}. You're off the hook."); generic ones for custom
+  animals. They rotate per animal (`aineko.nudgeRotation.v1`) instead of repeating.
+- **Localized animal sounds** (`server/src/sounds.ts`): for a detected language, the species' sound
+  list is swapped for that language's spellings (French cat "Miaou", dog "Ouaf", duck "Coin coin",
+  cow "Meuh"; Spanish "Miau/Guau/Cuac"; Japanese "ニャー/ワンワン"; ...). Naming the language alone
+  left Hayley saying "MEOW MEOW MEOW" in French; with this she's 4/4 "MIAOU MIAOU MIAOU". Mimics
+  (Winston) keep English -- their words are the human's own.
+- 1.2 (17) already on TestFlight has the simpler nudge (one notification ~2 days out from the last
+  animal talked to), which also fits these rules; the richer version ships with 1.3.

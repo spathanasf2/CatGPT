@@ -19,14 +19,16 @@ import { grantConsent, loadConsent, revokeConsent } from "@/lib/consent";
 import { refreshMembership } from "@/lib/membership";
 import { forgetAnimal, memoriesFor, rememberFor } from "@/lib/memory";
 import { bondFor, bondNote, forgetBonds, setBond } from "@/lib/bond";
+import { clearPromise, openPromise, setPromise } from "@/lib/promises";
 import {
-  cancelNudge,
+  cancelNudges,
   disableNudges,
   enableNudges,
   nudgesAvailable,
   nudgesOn,
   onNudgeTapped,
-  scheduleNudge,
+  previewNudge,
+  scheduleNudges,
 } from "@/lib/nudges";
 import { replyHaptic } from "@/lib/haptics";
 import { renderShareCard } from "@/lib/share-card";
@@ -68,12 +70,6 @@ function ensureDraft(list: Chat[]): { chats: Chat[]; activeId: string } {
   }
   const chat = newChat(DEFAULT_ANIMAL);
   return { chats: [chat, ...list], activeId: chat.id };
-}
-
-// The animal of the most recent chat you actually said something in (chats are most-recent-first).
-function lastTalkedTo(chats: Chat[]): AnimalRef | null {
-  const chat = chats.find((c) => c.messages.some((m) => m.role === "user"));
-  return chat ? chat.animal : null;
 }
 
 // Named animals go first ("Koba, sit!"), the rest in a fresh random order each turn.
@@ -188,17 +184,16 @@ export default function Home() {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
-  // "Misses you" nudges: scheduled as the app goes to the background, from whoever you talked to
-  // last; cancelled when it comes back. Tapping one opens a chat with that animal.
+  // "Misses you" nudges (lib/nudges.ts has the rules): scheduled as the app goes to the background,
+  // all cancelled when it comes back. Tapping one opens a chat with that animal.
   useEffect(() => {
     if (!nudgesAvailable()) return;
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
-        cancelNudge().catch(() => undefined);
+        cancelNudges().catch(() => undefined);
         return;
       }
-      const last = lastTalkedTo(chatsRef.current);
-      if (last) scheduleNudge(animalById(last), memoriesFor(last)).catch(() => undefined);
+      scheduleNudges(chatsRef.current).catch(() => undefined);
     };
     document.addEventListener("visibilitychange", onVisibility);
     const stopTaps = onNudgeTapped((id) => {
@@ -226,8 +221,7 @@ export default function Home() {
   }
 
   function handlePreviewNudge() {
-    const last = lastTalkedTo(chatsRef.current) ?? DEFAULT_ANIMAL;
-    scheduleNudge(animalById(last), memoriesFor(last), new Date(Date.now() + 5_000), true).catch(() => undefined);
+    previewNudge(chatsRef.current, DEFAULT_ANIMAL).catch(() => undefined);
   }
 
   // First launch: ask for AI permission as the boot screen clears (see ConsentModal).
@@ -417,6 +411,7 @@ export default function Home() {
     deleteCustomAnimal(animal.id);
     forgetAnimal(animal.id);
     forgetBonds(animal.id);
+    clearPromise(animal.id);
     setCustomAnimals(loadCustomAnimals());
     setChats((prev) =>
       prev.map((c) => {
@@ -442,9 +437,11 @@ export default function Home() {
     setPending((prev) => ({ ...prev, [chatId]: animal }));
     try {
       const before = bondFor(animal);
-      const reply = await askAnimal(animal, text, history, memoriesFor(animal), before, opts.roomMates);
+      const reply = await askAnimal(animal, text, history, memoriesFor(animal), before, opts.roomMates, openPromise(animal));
       replyHaptic();
       if (reply.remember) rememberFor(animal, reply.remember);
+      if (reply.kept) clearPromise(animal);
+      else if (reply.promise) setPromise(animal, reply.promise);
       if (reply.bond !== undefined) setBond(animal, reply.bond);
       const note = reply.bond !== undefined ? bondNote(animalById(animal).name, before, reply.bond) : null;
       const message: ChatMessage = {

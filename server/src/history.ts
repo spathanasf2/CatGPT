@@ -106,3 +106,16 @@ export function parseRoom(raw: unknown): RoomMate[] | undefined | null {
   }
   return mates;
 }
+
+// Promises (notifications, 1.4): the one thing the person promised this animal and hasn't delivered
+// yet -- "a walk after dinner". The app keeps it; a nudge can bring it up if it's never kept.
+const MAX_PROMISE_CHARS = 80;
+
+/** undefined = the app predates promises; null = nothing open; "invalid" = malformed. */
+export function parsePromise(raw: unknown): string | null | undefined | "invalid" {
+  if (raw === undefined) return undefined;
+  if (raw === null) return null;
+  if (typeof raw !== "string" || raw.trim().length === 0 || raw.length > 200) return "invalid";
+  return raw.trim().slice(0, MAX_PROMISE_CHARS);
+}
+

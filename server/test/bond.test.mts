@@ -26,3 +26,12 @@ test("levels and request validation", () => {
   assert.equal(parseBond(4), 4);
   for (const bad of [11, -11, 2.5, "4", {}]) assert.equal(parseBond(bad), "invalid");
 });
+
+test("promise field: absent, none open, open, or malformed", async () => {
+  const { parsePromise } = await import("../src/history.ts");
+  assert.equal(parsePromise(undefined), undefined);
+  assert.equal(parsePromise(null), null);
+  assert.equal(parsePromise("  a walk after dinner "), "a walk after dinner");
+  assert.equal(parsePromise("x".repeat(150))?.length, 80);
+  for (const bad of ["", "   ", 5, {}, "y".repeat(201)]) assert.equal(parsePromise(bad), "invalid");
+});

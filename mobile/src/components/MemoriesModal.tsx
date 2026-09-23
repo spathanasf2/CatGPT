@@ -5,6 +5,7 @@ import { ANIMALS, animalById, type AnimalRef } from "@/lib/animals";
 import { customById, isCustomId } from "@/lib/custom-animals";
 import { allMemories, forgetAll, MEMORY_LIMIT } from "@/lib/memory";
 import { allBonds, bondLevel, forgetBonds, LEVEL_LABEL } from "@/lib/bond";
+import { clearPromise } from "@/lib/promises";
 import { Avatar } from "./Avatar";
 
 type Props = {
@@ -61,6 +62,7 @@ export function MemoriesModal({ onClose }: Props) {
               if (window.confirm("Make every animal forget everything, feelings included? This can't be undone.")) {
                 forgetAll();
                 forgetBonds();
+                clearPromise();
                 setMemories({});
                 setBonds({});
               }

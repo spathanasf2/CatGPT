@@ -10,6 +10,9 @@ export type AnimalReply = {
   remember?: string;
   // How it feels about the person now (-10..10) -- stored by lib/bond.ts.
   bond?: number;
+  // Something just promised to it / the open promise delivered -- tracked by lib/promises.ts.
+  promise?: string;
+  kept?: boolean;
 };
 
 export type HistoryItem =
@@ -77,6 +80,8 @@ export async function askAnimal(
   bond: number | null,
   // Chatroom mode: the other animals in the room.
   roomMates?: AnimalRef[],
+  // What it's still waiting on, if anything (sending the field at all opts in to promise tracking).
+  promise: string | null = null,
   timeoutMs = 25_000,
 ): Promise<AnimalReply> {
   if (!serverConfigured()) throw new ChatError("unavailable", "Aineko server URL or token not configured");
@@ -94,6 +99,7 @@ export async function askAnimal(
           history,
           memory,
           bond,
+          promise,
           ...customBody(animal),
           ...(roomMates?.length ? { room: roomMates.map((id) => ({ animal: id, ...customLabel(id) })) } : {}),
         }),
@@ -109,6 +115,8 @@ export async function askAnimal(
           narrative?: unknown;
           remember?: unknown;
           bond?: unknown;
+          promise?: unknown;
+          kept?: unknown;
           error?: unknown;
           code?: unknown;
           tier?: unknown;
@@ -137,6 +145,8 @@ export async function askAnimal(
     const reply: AnimalReply = { sounds: body.sounds, narrative: body.narrative };
     if (typeof body.remember === "string" && body.remember.trim()) reply.remember = body.remember.trim();
     if (typeof body.bond === "number" && Number.isInteger(body.bond)) reply.bond = body.bond;
+    if (typeof body.promise === "string" && body.promise.trim()) reply.promise = body.promise.trim();
+    if (body.kept === true) reply.kept = true;
     return reply;
   } finally {
     clearTimeout(timer);

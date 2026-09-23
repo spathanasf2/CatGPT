@@ -4,7 +4,7 @@ import { log } from "./log.js";
 import { askAnimal } from "./openrouter.js";
 import { ANIMALS, resolveAnimal, type Animal } from "./animals.js";
 import { customAnimal, parseCustom } from "./custom.js";
-import { parseHistory, parseMemory, parseRoom } from "./history.js";
+import { parseHistory, parseMemory, parsePromise, parseRoom } from "./history.js";
 import { parseBond } from "./bond.js";
 import { MODELS, isAllowedModel } from "./models.js";
 import { getUsage, recordShareLinkHit } from "./usage.js";
@@ -146,6 +146,7 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
     memory: rawMemory,
     bond: rawBond,
     room: rawRoom,
+    promise: rawPromise,
   } = req.body ?? {};
   // Either a built-in (by id) or a custom animal the app describes in full (members only).
   let character: Animal;
@@ -194,6 +195,11 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
     res.status(400).json({ error: "room must list 1 to 3 other animals" });
     return;
   }
+  const promise = parsePromise(rawPromise);
+  if (promise === "invalid") {
+    res.status(400).json({ error: "promise must be null or a short string" });
+    return;
+  }
   const caller = resolveCaller(req);
   if (character.membersOnly && caller.tier !== "member") {
     const name = legacy ? `the ${character.species}` : character.name;
@@ -225,6 +231,7 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
       memory,
       bond,
       room,
+      promise,
       budgetKeys: caller.checks.map(([key]) => key),
       history,
       modelOverride: model,
