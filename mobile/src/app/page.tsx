@@ -32,7 +32,7 @@ const DEFAULT_ANIMAL: AnimalId = ANIMALS[0]!.id;
 const STARTER_PROMPTS: { label: string; message: string }[] = [
   { label: "say hi", message: "Hi!" },
   { label: "ask how their day was", message: "How was your day?" },
-  { label: "give them a name", message: "I'm going to call you Waffles." },
+  { label: "give them a nickname", message: "I'm going to call you Waffles." },
   { label: "tell them a secret", message: "Don't tell anyone, but..." },
 ];
 
@@ -58,22 +58,22 @@ function formatDay(iso: string): string {
 // not for the person chatting.
 function errorMessage(err: unknown, animal: AnimalId): ChatMessage {
   console.warn("chat request failed", err);
-  const label = animalById(animal).label.toLowerCase();
+  const name = animalById(animal).name;
   const kind: ChatErrorKind = err instanceof ChatError ? err.kind : "unavailable";
   const quota = err instanceof ChatError ? err.quota : undefined;
   const period = quota?.window === "monthly" ? "month" : "week";
   const copy: Record<ChatErrorKind, string> = {
-    offline: `*the ${label} can't hear you.* Check your connection and try again.`,
-    timeout: `*the ${label} wandered off mid-thought.* Try again?`,
-    "rate-limited": `*the ${label} needs a breather.* You're sending messages faster than it can keep up -- give it a minute.`,
+    offline: `*${name} can't hear you.* Check your connection and try again.`,
+    timeout: `*${name} wandered off mid-thought.* Try again?`,
+    "rate-limited": `*${name} needs a breather.* You're sending messages faster than ${name} can keep up -- give it a minute.`,
     // "About 10x" mirrors FREE_FRACTION=0.1 in server/src/limits.ts.
     quota: !quota
-      ? `*the ${label} is all talked out.* You've hit the chat limit for now.`
+      ? `*${name} is all talked out.* You've hit the chat limit for now.`
       : quota.tier === "free"
-        ? `*the ${label} is all talked out.* You've used this ${period}'s free chats -- they come back ${formatDay(quota.resetAt)}. Members get about 10\u00d7 more.`
-        : `*the ${label} is all talked out.* You've used this ${period}'s chats -- they come back ${formatDay(quota.resetAt)}.`,
-    "members-only": `*the ${label} only talks to members.* Bonus animals come with a membership.`,
-    unavailable: `*the ${label} didn't answer.* Something went wrong on our end -- try again in a bit.`,
+        ? `*${name} is all talked out.* You've used this ${period}'s free chats -- they come back ${formatDay(quota.resetAt)}. Members get about 10\u00d7 more.`
+        : `*${name} is all talked out.* You've used this ${period}'s chats -- they come back ${formatDay(quota.resetAt)}.`,
+    "members-only": `*${name} only talks to members.* Bonus animals come with a membership.`,
+    unavailable: `*${name} didn't answer.* Something went wrong on our end -- try again in a bit.`,
   };
   const offerMembership = kind === "members-only" || (kind === "quota" && quota?.tier !== "member");
   return {
@@ -355,7 +355,7 @@ export default function Home() {
             >
               {ANIMALS.filter((a) => !a.membersOnly).map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.emoji} {a.label}
+                  {a.emoji} {a.name}
                 </option>
               ))}
               {/* Bonus animals grouped under their own header (a section break in iOS's native
@@ -363,7 +363,7 @@ export default function Home() {
               <optgroup label="Members only">
                 {ANIMALS.filter((a) => a.membersOnly).map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.emoji} {a.label}
+                    {a.emoji} {a.name}
                   </option>
                 ))}
               </optgroup>
@@ -467,7 +467,7 @@ export default function Home() {
                   // send. Safari reports it as keyCode 229 rather than via isComposing.
                   if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) handleSend();
                 }}
-                placeholder={`say something to the ${currentAnimal?.label.toLowerCase()}...`}
+                placeholder={`say something to ${currentAnimal?.name}...`}
                 enterKeyHint="send"
               />
               <button

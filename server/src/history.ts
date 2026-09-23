@@ -1,4 +1,4 @@
-import { isAnimalId, type AnimalId } from "./animals.js";
+import { resolveAnimal, type AnimalId } from "./animals.js";
 
 export type HistoryItem =
   | { role: "user"; text: string }
@@ -32,11 +32,13 @@ export function parseHistory(raw: unknown): HistoryItem[] | null {
       items.push({ role: "user", text: clip(e.text) });
     } else if (
       e.role === "animal" &&
-      isAnimalId(e.animal) &&
+      resolveAnimal(e.animal) &&
       typeof e.sounds === "string" &&
       typeof e.narrative === "string"
     ) {
-      items.push({ role: "animal", animal: e.animal, sounds: clip(e.sounds), narrative: clip(e.narrative) });
+      // Species ids (older builds) map to their default character.
+      const animal = resolveAnimal(e.animal)!.id;
+      items.push({ role: "animal", animal, sounds: clip(e.sounds), narrative: clip(e.narrative) });
     } else {
       return null;
     }

@@ -25,34 +25,53 @@ export type AnimalReply = {
   narrative: string;
 };
 
-function buildSystemPrompt(animal: Animal): string {
+const POSSESSIVE = { she: "her", he: "his", it: "its" } as const;
+const cap = (s: string) => s[0]!.toUpperCase() + s.slice(1);
+
+// How the prompt refers to the character. `legacy` requests (app builds that only know species
+// ids) keep the character's personality but go unnamed -- see resolveAnimal in animals.ts.
+function who(animal: Animal, legacy: boolean): string {
+  return legacy ? `the ${animal.species}` : animal.name;
+}
+
+function buildSystemPrompt(animal: Animal, legacy: boolean): string {
+  const name = who(animal, legacy);
+  const Name = cap(name);
+  const They = cap(animal.pronoun);
+  const their = POSSESSIVE[animal.pronoun];
+  const species = animal.species;
+  // Descriptions don't always name the species ("a boxer", "a mallard"), so it's stated outright.
+  const intro = legacy
+    ? `You are roleplaying as a ${species} that a human is talking to, like a chatbot. ${Name} does not understand human language.`
+    : `You are roleplaying as ${animal.name}, ${animal.description}, whom a human is talking to like a chatbot. ${Name} is a ${species} and does not understand human language.`;
+
   const triggerLine =
     animal.triggers.length > 0
-      ? `It listens for a small set of words a real ${animal.label} would plausibly recognize -- things like ${animal.triggers.join(", ")}, its own species called out by name, or whatever else genuinely fits -- and reacts to THOSE specifically, often at the expense of whatever the human actually meant. The comedy is in the mismatch: "I'm exhausted, I can't even walk to the mailbox" can land as an invitation for a walk, and the reaction should commit to that fully, no hedging, no acknowledging the mismatch.`
-      : `It has no fixed vocabulary of recognized words -- see its personality above for how it actually processes what it hears.`;
+      ? `${Name} listens for a small set of words a real ${species} would plausibly recognize -- things like ${animal.triggers.join(", ")}, ${legacy ? `${their} own species called out` : `${their} own name`}, or whatever else genuinely fits -- and reacts to THOSE specifically, often at the expense of whatever the human actually meant. The comedy is in the mismatch: "I'm exhausted, I can't even walk to the mailbox" can land as an invitation for a walk, and the reaction should commit to that fully, no hedging, no acknowledging the mismatch.`
+      : `${Name} has no fixed vocabulary of recognized words -- see the personality above for how ${animal.pronoun} actually processes what ${animal.pronoun} hears.`;
 
   const speechLine = animal.mimics
-    ? `It cannot form words of its own -- the only human words it ever produces are short fragments parroted back, mangled, from what the human said. Everything else is real ${animal.label} vocalization.`
-    : `It cannot form real words. It can only reply with real ${animal.label} vocalizations.`;
+    ? `${They} cannot form words of ${their} own -- the only human words ${animal.pronoun} ever produces are short fragments parroted back, mangled, from what the human said. Everything else is real ${species} vocalization.`
+    : `${They} cannot form real words, and can only reply with real ${species} vocalizations.`;
   const soundsRule = animal.mimics
-    ? `no words of its own, ever. Most replies should work in one or two words lifted straight from the human's message, mangled and shouted among the squawks (e.g. "SQUAWK! LASAGNA! RAWK!") -- the mimicry goes HERE in "sounds", never in the narrative`
+    ? `no words of ${their} own, ever. Most replies should work in one or two words lifted straight from the human's message, mangled and shouted among the squawks (e.g. "SQUAWK! LASAGNA! RAWK!") -- the mimicry goes HERE in "sounds", never in the narrative`
     : "no other words, ever";
 
-  return `You are roleplaying as a ${animal.label} that a human is talking to, like a chatbot. The ${animal.label} does not understand human language. ${speechLine}
+  return `${intro} ${speechLine}
 
 Personality: ${animal.personality}
 
 ${triggerLine}
 
-Typical sounds this ${animal.label} makes: ${animal.vocabulary.join(", ")}. Not an exhaustive list -- stay strictly within realistic ${animal.label} vocalizations and whatever the personality above implies about how it uses sound. Never another species' sounds.
+Typical sounds ${name} makes: ${animal.vocabulary.join(", ")}. Not an exhaustive list -- stay strictly within realistic ${species} vocalizations and whatever the personality above implies about how ${animal.pronoun} uses sound. Never another species' sounds.
 
 Keep every word family-friendly, including real animal words that sound rude when a kid reads them out loud -- never "nicker" (a horse whinnies).
 
 Given the human's message, respond with a JSON object with exactly two fields:
-- "sounds": a short burst of onomatopoeia (roughly 1 to 6 sounds) reacting emotionally, written the way a comic renders animal noise (e.g. "BORK BORK BORK"). This is literally everything the animal "says" -- ${soundsRule}.
-- "narrative": one short, funny, third-person stage direction wrapped in asterisks. Describe a specific physical action, not a vague mood -- "paws at the door, certain a walk is imminent" beats "seems happy." When a recognized word applies, show what the animal seems to think it heard, even if it's a comically wrong read of the actual message, and commit to that misunderstanding completely. Not every reply needs a misheard word, though -- when nothing recognizable is in the message, just react to the emotional tone of what was said, in character. One sentence. Vary the joke shape across replies; don't lean on the same beat every time.
+- "sounds": a short burst of onomatopoeia (roughly 1 to 6 sounds) reacting emotionally, written the way a comic renders animal noise (e.g. "BORK BORK BORK"). This is literally everything ${name} "says" -- ${soundsRule}.
+- "narrative": one short, funny, third-person stage direction wrapped in asterisks. Describe a specific physical action, not a vague mood -- "paws at the door, certain a walk is imminent" beats "seems happy." When a recognized word applies, show what ${name} seems to think ${animal.pronoun} heard, even if it's a comically wrong read of the actual message, and commit to that misunderstanding completely. Not every reply needs a misheard word, though -- when nothing recognizable is in the message, just react to the emotional tone of what was said, in character. One sentence. Vary the joke shape across replies; don't lean on the same beat every time.
 
-You may be shown the last few turns of the conversation. The ${animal.label} still doesn't understand language, but like a real pet it picks up on patterns: a name it keeps being called, a word it just heard, its own mood carrying over from a moment ago. Never repeat an earlier reply's sounds or action verbatim. Bracketed notes like "[The dog reacted: ...]" are other animals in the room -- notice them only the way a real ${animal.label} would, and only ever answer as yourself.
+You may be shown the last few turns of the conversation. ${Name} still doesn't understand language, but like a real pet ${animal.pronoun} picks up on patterns: a name ${animal.pronoun} keeps being called, a word ${animal.pronoun} just heard, ${their} own mood carrying over from a moment ago. Never repeat an earlier reply's sounds or action verbatim. Bracketed notes like "[Koba the dog reacted: ...]" are other animals in the room -- notice them only the way a real ${species} would, and only ever answer as ${name}.
 
 Respond with ONLY the JSON object. No markdown, no code fences, no extra commentary.`;
 }
@@ -63,7 +82,7 @@ type ChatTurn = { role: "system" | "user" | "assistant"; content: string };
 // produce, which also reinforces the format); other animals' replies go in as bracketed notes on
 // the user side. Adjacent same-role turns are merged -- not every provider behind OpenRouter
 // accepts two user turns in a row, and they happen whenever an errored reply was dropped.
-function buildMessages(animal: Animal, history: HistoryItem[], message: string): ChatTurn[] {
+function buildMessages(animal: Animal, legacy: boolean, history: HistoryItem[], message: string): ChatTurn[] {
   const turns: ChatTurn[] = [];
   const push = (role: "user" | "assistant", content: string) => {
     const last = turns[turns.length - 1];
@@ -74,16 +93,20 @@ function buildMessages(animal: Animal, history: HistoryItem[], message: string):
     if (item.role === "user") push("user", item.text);
     else if (item.animal === animal.id)
       push("assistant", JSON.stringify({ sounds: kidSafe(item.sounds), narrative: kidSafe(item.narrative) }));
-    else push("user", `[The ${ANIMALS[item.animal].label} reacted: ${kidSafe(item.sounds)} ${kidSafe(item.narrative)}]`);
+    else {
+      const other = ANIMALS[item.animal];
+      const label = legacy ? `The ${other.species}` : `${other.name} the ${other.species}`;
+      push("user", `[${label} reacted: ${kidSafe(item.sounds)} ${kidSafe(item.narrative)}]`);
+    }
   }
   // A leading assistant turn (its user turn got trimmed off the history window) has nothing to
   // answer, so drop it.
   while (turns[0]?.role === "assistant") turns.shift();
   push("user", message);
-  return [{ role: "system", content: buildSystemPrompt(animal) }, ...turns];
+  return [{ role: "system", content: buildSystemPrompt(animal, legacy) }, ...turns];
 }
 
-function parseReply(content: string, animal: Animal): AnimalReply {
+function parseReply(content: string, animal: Animal, legacy: boolean): AnimalReply {
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
@@ -96,12 +119,13 @@ function parseReply(content: string, animal: Animal): AnimalReply {
   const sounds = typeof obj.sounds === "string" ? obj.sounds.trim() : "";
   const narrative = typeof obj.narrative === "string" ? obj.narrative.trim() : "";
   if (!sounds) throw new Error("model output missing sounds");
-  return { sounds: kidSafe(sounds), narrative: kidSafe(narrative) || `*the ${animal.label} looks at you.*` };
+  return { sounds: kidSafe(sounds), narrative: kidSafe(narrative) || `*${who(animal, legacy)} looks at you.*` };
 }
 
 async function callOpenRouter(
   model: string,
   animal: Animal,
+  legacy: boolean,
   messages: ChatTurn[],
   budgetKeys: string[],
   signal: AbortSignal,
@@ -149,12 +173,14 @@ async function callOpenRouter(
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error(`openrouter returned no content (${model})`);
 
-  return parseReply(content, animal);
+  return parseReply(content, animal, legacy);
 }
 
 export type AskOptions = {
   // Every budget this request counts against (see resolveCaller in index.ts).
   budgetKeys: string[];
+  // Request named the animal by species id (app builds 1.0 (1)-(12)): same character, unnamed.
+  legacy?: boolean;
   history?: HistoryItem[];
   modelOverride?: string;
   // Aborted when the caller disconnects, so nobody pays for fallback replies no one will read.
@@ -164,12 +190,12 @@ export type AskOptions = {
 export async function askAnimal(
   animalId: AnimalId,
   message: string,
-  { budgetKeys, history = [], modelOverride, signal }: AskOptions,
+  { budgetKeys, legacy = false, history = [], modelOverride, signal }: AskOptions,
 ): Promise<AnimalReply> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured");
   const animal = ANIMALS[animalId];
-  const messages = buildMessages(animal, history, message);
+  const messages = buildMessages(animal, legacy, history, message);
 
   const primary = modelOverride || process.env.OPENROUTER_MODEL || MODELS[0]!.id;
   const candidates = [primary, ...MODELS.map((m) => m.id).filter((id) => id !== primary)];
@@ -180,7 +206,7 @@ export async function askAnimal(
   for (const model of candidates) {
     if (stop.aborted) break;
     try {
-      return await callOpenRouter(model, animal, messages, budgetKeys, stop);
+      return await callOpenRouter(model, animal, legacy, messages, budgetKeys, stop);
     } catch (err) {
       lastError = err;
       log.warn("model failed, trying next fallback", {

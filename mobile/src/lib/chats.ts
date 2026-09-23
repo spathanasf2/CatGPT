@@ -1,4 +1,4 @@
-import type { AnimalId } from "./animals";
+import { ANIMALS, normalizeAnimalId, type AnimalId } from "./animals";
 import { newId } from "./ids";
 
 export type ChatMessage =
@@ -46,10 +46,23 @@ export function loadChats(): Chat[] {
     }
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed.map(migrateAnimals) : [];
   } catch {
     return [];
   }
+}
+
+// Builds 1.0 (1)-(12) stored species ids ("cat"); characters replaced them (2026-09-23). Rewritten
+// on load, so the rest of the app only ever sees character ids.
+function migrateAnimals(chat: Chat): Chat {
+  const fix = (id: unknown): AnimalId => normalizeAnimalId(id) ?? ANIMALS[0]!.id;
+  return {
+    ...chat,
+    animal: fix(chat.animal),
+    messages: (chat.messages ?? []).map((m) =>
+      m.role === "animal" || (m.role === "error" && m.animal) ? { ...m, animal: fix(m.animal) } : m,
+    ),
+  };
 }
 
 export function saveChats(chats: Chat[]): void {

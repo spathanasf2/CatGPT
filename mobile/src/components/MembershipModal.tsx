@@ -26,7 +26,7 @@ function Perks() {
   return (
     <ul className="perk-list">
       <li>
-        {BONUS.map((a) => a.emoji).join(" ")} Bonus animals: {BONUS.map((a) => a.label.toLowerCase()).join(", ")}
+        {BONUS.map((a) => a.emoji).join(" ")} Bonus animals: {BONUS.map((a) => `${a.name} the ${a.species}`).join(", ")}
       </li>
       <li>About 10&times; the free chat allowance</li>
     </ul>

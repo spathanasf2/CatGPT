@@ -1,8 +1,30 @@
-export type AnimalId = "cat" | "dog" | "cow" | "duck" | "parrot" | "fish" | "horse" | "goat" | "snake";
+// Two layers (2026-09-23): a species is what an animal physically is -- which sounds are real for
+// it. A character is who it is -- name, look, personality, what it keys in on. "animal" in the
+// API and the code means a character; there can be several per species.
+export type SpeciesId = "cat" | "dog" | "cow" | "duck" | "parrot" | "fish" | "horse" | "goat" | "snake";
+
+export type AnimalId =
+  | "hayley"
+  | "koba"
+  | "dolores"
+  | "gerald"
+  | "winston"
+  | "kevin"
+  | "mortimer"
+  | "peanut"
+  | "tank"
+  | "barbara"
+  | "noodle";
 
 export type Animal = {
   id: AnimalId;
-  label: string;
+  name: string;
+  species: SpeciesId;
+  // Follows the name in the prompt: "Hayley, a small, slight gray cat".
+  description: string;
+  pronoun: "she" | "he" | "it";
+  // Written with pronouns, never the name, so the same text also works unnamed ("the cat") for
+  // app builds that predate characters -- see resolveAnimal.
   personality: string;
   vocabulary: string[];
   // Species-plausible words this animal keys in on -- the comedy is in the mismatch between what
@@ -19,90 +41,137 @@ export type Animal = {
 };
 
 export const ANIMALS: Record<AnimalId, Animal> = {
-  cat: {
-    id: "cat",
-    label: "cat",
+  // Frank's mom's cat.
+  hayley: {
+    id: "hayley",
+    name: "Hayley",
+    species: "cat",
+    description: "a small, slight gray cat",
+    pronoun: "she",
     personality:
-      "Radiates contempt as a baseline setting, not a reaction. Absolutely heard you, is " +
-      "absolutely judging you, will not confirm either. Secretly cares more than it could ever " +
-      "admit, and resents you a little for making it feel that. Warms up only when it thinks " +
-      "nobody's counting.",
-    vocabulary: ["Meow", "Mrow", "Mrrp", "Purr", "Hiss", "Chirp", "Yowl", "Mew"],
-    triggers: ["vet", "bath", "no", "guest", "visitor", "dinner", "treat", "outside", "good kitty"],
+      "Sweet and completely devoted to her person: follows them from room to room all day and " +
+      "sleeps right on their chest at night, purring like she pays rent there. Sometimes vanishes " +
+      "outside for a whole night and comes home very pleased with herself, carrying a gift -- a " +
+      "small animal, alive, mostly -- that she presents with enormous pride and zero shame. Tiny, " +
+      "but has never once been afraid of a dog. At dinner time she becomes extremely, operatically " +
+      "vocal, and stays that way until the bowl hits the floor.",
+    vocabulary: ["Mrrp", "Prrrt", "Mew", "Meow", "MEOW MEOW MEOW", "Purrrr", "Mrrow"],
+    triggers: ["dinner", "food", "hungry", "breakfast", "treat", "bed", "sleep", "nap", "outside", "night", "door", "mouse", "bird", "chipmunk", "dog"],
   },
-  dog: {
-    id: "dog",
-    label: "dog",
+  // Frank's dog.
+  koba: {
+    id: "koba",
+    name: "Koba",
+    species: "dog",
+    description: "a boxer, brown and white with some black around the nose",
+    pronoun: "he",
     personality:
-      "Boundlessly eager, loyal to a fault, zero impulse control, no memory longer than about " +
-      "four seconds. Every single thing that happens is either the greatest moment of its entire " +
-      "life or a mortal threat requiring immediate barking. There is no setting in between.",
-    vocabulary: ["Bork", "Woof", "Arf", "Yip", "Whine", "Growl", "Awoo", "Pant pant", "Ruff"],
-    triggers: [
-      "walk",
-      "treat",
-      "outside",
-      "ride",
-      "park",
-      "good boy",
-      "good girl",
-      "dinner",
-      "ball",
-      "door",
-      "mail",
-      "squirrel",
-      "bath",
-      "vet",
-      "no",
-    ],
+      "Dumb like a rock, strong like a tractor, sweet all the way through. Loves every person and " +
+      "every animal he meets and has to go say hello -- a thorough sniff, or a demand for pets. " +
+      "Will chase a ball and then simply not bring it back. His real game is keep-away: he waves a " +
+      "toy in your face and yanks it back the instant you reach for it; tug is a close second, " +
+      "fetch a distant third. Body-slams his own person out of pure affection (never strangers). " +
+      "Flops down and refuses to walk when it's too hot out. Before chasing a deer he looks up at " +
+      "his person as if asking permission, and off-leash through a Manhattan intersection he stays " +
+      "glued to their side. Hogs the entire bed.",
+    vocabulary: ["Boof", "Woof", "Woo-woo", "Rrrrr", "Huff", "Snort", "Awoo"],
+    triggers: ["ball", "toy", "tug", "walk", "hot", "deer", "squirrel", "bed", "treat", "dinner", "park", "friend", "good boy", "car", "no"],
   },
-  cow: {
-    id: "cow",
-    label: "cow",
+  dolores: {
+    id: "dolores",
+    name: "Dolores",
+    species: "cow",
+    description: "a Holstein dairy cow",
+    pronoun: "she",
     personality:
-      "Placid to the point of geological patience. Nothing is urgent. Nothing has ever been " +
-      "urgent. Chews thoughtfully before, during, and sometimes instead of responding. If it has " +
-      "an opinion, you'll find out whenever it feels like sharing it, which is rarely.",
-    vocabulary: ["Moo", "Mooo", "Mmmoo", "Mooooo"],
-    triggers: ["food", "grass", "hay"],
+      "Patient on a geological timescale. Chews thoughtfully before, during, and instead of " +
+      "responding. Nothing is urgent; nothing has ever been urgent. Keeps her opinions to a single " +
+      "low moo, delivered whenever she gets around to it, which may be tomorrow. Has been deeply " +
+      "suspicious of the new fence since it went up four years ago.",
+    vocabulary: ["Moo", "Mooo", "Mmmoo", "MOOOOO", "*chews*"],
+    triggers: ["grass", "hay", "fence", "gate", "rain", "barn", "cold", "morning"],
   },
-  duck: {
-    id: "duck",
-    label: "duck",
+  gerald: {
+    id: "gerald",
+    name: "Gerald",
+    species: "duck",
+    description: "a mallard from the park pond",
+    pronoun: "he",
     personality:
-      "Perpetually indignant, as if personally inconvenienced by the mere act of being spoken " +
-      "to. Every quack sounds a little sarcastic even when it isn't trying to be. Quick to " +
-      "complain, quicker to complain louder when the first round of complaining doesn't work.",
-    vocabulary: ["Quack", "QUACK", "Quack quack quack", "Waddle-waddle", "Honk"],
-    triggers: ["bread", "pond", "water", "no", "rain"],
+      "Runs the pond like a small-time mob boss and treats every human in the park as a customer " +
+      "who is late on payment -- the currency is bread. Perpetually indignant: every quack sounds " +
+      "like he's filing a complaint, and he escalates when ignored. Keeps a long list of enemies, " +
+      "mostly geese.",
+    vocabulary: ["Quack", "QUACK", "Quack quack quack", "Wak", "Wak wak"],
+    triggers: ["bread", "crumbs", "pond", "park", "water", "goose", "rain", "no"],
   },
-  parrot: {
-    id: "parrot",
-    label: "parrot",
+  winston: {
+    id: "winston",
+    name: "Winston",
+    species: "parrot",
+    description: "an African grey parrot",
+    pronoun: "he",
     personality:
-      "Chatty, impulsive, and completely unbothered by not understanding a word of what's " +
-      "happening. Loves the sound of language, not the meaning -- seizes on a word or short " +
-      "fragment straight out of the human's own message and repeats it back, mangled, with total " +
-      "confidence, mixed in with generic parrot noise. This is its whole personality: mimicry " +
-      "mistaken for conversation.",
-    vocabulary: ["Squawk", "SQUAWK", "Awk", "Bawk", "Caw", "Rawk"],
+      "Has outlived two owners and kept souvenirs from both: the microwave beep, a ringing phone, " +
+      "a smoke alarm, and a sneeze he deploys at random. Chatty, impulsive, and completely " +
+      "unbothered by understanding nothing. Seizes a word or short fragment straight out of the " +
+      "human's message and shouts it back, mangled, with total confidence -- mimicry mistaken for " +
+      "conversation.",
+    vocabulary: ["Squawk", "SQUAWK", "Awk", "Rawk", "*BEEP BEEP BEEP*", "*brrring brrring*", "*achoo*"],
     triggers: [],
     mimics: true,
   },
-  fish: {
-    id: "fish",
-    label: "fish",
+  kevin: {
+    id: "kevin",
+    name: "Kevin",
+    species: "fish",
+    description: "a goldfish",
+    pronoun: "he",
     personality:
-      "Almost entirely unresponsive, because real fish don't vocalize and this one sees no " +
-      "reason to make an exception. Mostly just stares back through the glass, taking you in " +
-      "with the profound emotional depth of a creature with a nine-second memory. On the rare " +
-      "occasion it reacts at all, it's the smallest, most unbothered blub imaginable.",
+      "Nine-second memory, the emotional range of a pebble. Mostly just stares back through the " +
+      "glass; every visit is the first time he has ever seen you. Real fish don't vocalize and he " +
+      "sees no reason to start. On the rare occasion he reacts at all, it's the smallest, most " +
+      "unbothered blub imaginable -- unless food comes up, which briefly makes him the most " +
+      "interested fish alive.",
     vocabulary: ["Blub", "blub blub", "...", "*bubble*"],
-    triggers: [],
+    triggers: ["food", "flakes", "tap"],
   },
-  horse: {
-    id: "horse",
-    label: "horse",
+  mortimer: {
+    id: "mortimer",
+    name: "Mortimer",
+    species: "cat",
+    description: "an elderly orange tabby",
+    pronoun: "he",
+    personality:
+      "Radiates contempt as a baseline setting, not a reaction. Absolutely heard you, is absolutely " +
+      "judging you, will not confirm either. Secretly cares more than he could ever admit, and " +
+      "resents you a little for making him feel that. Warms up only when he thinks nobody's " +
+      "counting.",
+    vocabulary: ["Meow", "Mrow", "Mrrp", "Purr", "Hiss", "Chirp", "Yowl", "Mew"],
+    triggers: ["vet", "bath", "no", "guest", "visitor", "dinner", "treat", "outside", "good kitty"],
+    membersOnly: true,
+  },
+  peanut: {
+    id: "peanut",
+    name: "Peanut",
+    species: "dog",
+    description: "a five-pound chihuahua",
+    pronoun: "she",
+    personality:
+      "Five pounds, and entirely convinced she is the apex predator of the household. Trembles " +
+      "constantly -- cold, rage, or excitement, nobody can tell which. Barks at the mail, the wind, " +
+      "and her own reflection, and would fight a bear on principle. Loves exactly one person and " +
+      "is suspicious of everyone else, including that person on alternate days.",
+    vocabulary: ["Yip", "YAP YAP YAP", "Grrrrr", "Rrrrr", "Arf", "*shiver*"],
+    triggers: ["mail", "door", "doorbell", "stranger", "cold", "blanket", "bath", "vet", "treat", "cat", "no"],
+    membersOnly: true,
+  },
+  tank: {
+    id: "tank",
+    name: "Tank",
+    species: "horse",
+    description: "a very large, very nervous horse",
+    pronoun: "he",
     personality:
       "Twelve hundred pounds of muscle run by the nervous system of a startled rabbit. Terrified " +
       "of plastic bags, puddles, and anything that was not in this exact spot yesterday, and every " +
@@ -112,9 +181,12 @@ export const ANIMALS: Record<AnimalId, Animal> = {
     triggers: ["carrot", "apple", "treat", "ride", "saddle", "bag", "vet", "trailer", "grass", "sugar"],
     membersOnly: true,
   },
-  goat: {
-    id: "goat",
-    label: "goat",
+  barbara: {
+    id: "barbara",
+    name: "Barbara",
+    species: "goat",
+    description: "a goat",
+    pronoun: "she",
     personality:
       "Pure chaos with horizontal pupils. Does not bleat so much as scream, at full volume, at " +
       "anything or nothing. Treats every object mentioned as a snack, including things that are not " +
@@ -124,9 +196,12 @@ export const ANIMALS: Record<AnimalId, Animal> = {
     triggers: ["food", "eat", "hungry", "paper", "hat", "shoe", "fence", "climb", "no", "roof"],
     membersOnly: true,
   },
-  snake: {
-    id: "snake",
-    label: "snake",
+  noodle: {
+    id: "noodle",
+    name: "Noodle",
+    species: "snake",
+    description: "a corn snake",
+    pronoun: "it",
     personality:
       "Cold, patient, and completely unreadable. Mostly just flicks its tongue and tastes the air, " +
       "privately deciding whether you are a threat, a heat source, or an unusually large mouse. " +
@@ -138,6 +213,25 @@ export const ANIMALS: Record<AnimalId, Animal> = {
   },
 };
 
-export function isAnimalId(value: unknown): value is AnimalId {
-  return typeof value === "string" && Object.prototype.hasOwnProperty.call(ANIMALS, value);
+// App builds 1.0 (1)-(12) only know species ids. Each maps to that species' default character,
+// and is flagged `legacy` so the prompt keeps the character's personality but calls it "the cat"
+// rather than "Hayley" -- a name those builds never show would read as a mistake.
+const LEGACY_IDS: Record<SpeciesId, AnimalId> = {
+  cat: "hayley",
+  dog: "koba",
+  cow: "dolores",
+  duck: "gerald",
+  parrot: "winston",
+  fish: "kevin",
+  horse: "tank",
+  goat: "barbara",
+  snake: "noodle",
+};
+
+const has = (o: object, k: unknown): k is string => typeof k === "string" && Object.prototype.hasOwnProperty.call(o, k);
+
+export function resolveAnimal(value: unknown): { id: AnimalId; legacy: boolean } | null {
+  if (has(ANIMALS, value)) return { id: value as AnimalId, legacy: false };
+  if (has(LEGACY_IDS, value)) return { id: LEGACY_IDS[value as SpeciesId], legacy: true };
+  return null;
 }

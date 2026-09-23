@@ -698,3 +698,30 @@ Crude Humor" (sounds + a filtered, family-friendly stage direction). Expect 4+.
   -- the **one path not yet verified end to end** is a real Apple-signed JWS through
   `entitlement.ts` (the test suite covers the mechanics with a look-alike chain). If the horse
   stays locked after a sandbox purchase, check `docker logs aineko` and the header size first.
+
+## Characters, not species (2026-09-23) -- on foundry; production waits for build 12's review
+Animals are now named individuals: a **species** (`SpeciesId` -- what's physically real for it,
+e.g. which sounds) plus a **character** (`AnimalId` -- name, description, pronoun, personality,
+triggers). `server/src/animals.ts` holds the personalities; `mobile/src/lib/animals.ts` only what
+the UI draws (name, emoji, accent, thinking line) -- keep ids, order and `membersOnly` in sync.
+Several characters can share a species, which is what custom animals and chatroom mode build on.
+
+Free: **Hayley** (cat -- Frank's mom's cat, from Frank's description: small, gray, devoted,
+all-night hunter bringing live gifts, unafraid of dogs, operatic at dinner), **Koba** (dog --
+Frank's boxer: dumb/strong/sweet, keep-away > tug > fetch, body-slams his person, won't walk in the
+heat, asks permission before chasing deer, bed hog), Dolores (cow), Gerald (duck), Winston
+(parrot, mimic), Kevin (goldfish). Members: Mortimer (cat -- the old contempt personality), Peanut
+(chihuahua), Tank (horse), Barbara (goat), Noodle (snake). Everything but Hayley and Koba is
+Claude-designed; Frank has veto.
+
+**Back-compat:** app builds 1.0 (1)-(12) send species ids (`cat`). `resolveAnimal()` maps each to
+its species' default character and flags it `legacy`, so those builds get the character's
+personality but addressed as "the cat" -- never a name their UI doesn't show. The app rewrites
+saved chats' species ids to character ids on load (`migrateAnimals` in `lib/chats.ts`).
+
+**Deploy order:** build 12 is under App Review against production, so this server change is on
+foundry only. Once 12 is approved: deploy the server to Hetzner (old builds keep working via the
+legacy mapping), then cut build 13 -- a character-id build can't go out before production knows
+the ids. Build 13 also needs: regenerated App Store screenshots (names now show in the picker and
+placeholder) and review notes updated from "horse, goat and snake" to the new bonus roster.
+\n

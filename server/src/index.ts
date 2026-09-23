@@ -2,7 +2,7 @@ import express from "express";
 import { bearerAuth } from "./auth.js";
 import { log } from "./log.js";
 import { askAnimal } from "./openrouter.js";
-import { ANIMALS, isAnimalId } from "./animals.js";
+import { ANIMALS, resolveAnimal } from "./animals.js";
 import { parseHistory } from "./history.js";
 import { MODELS, isAllowedModel } from "./models.js";
 import { getUsage } from "./usage.js";
@@ -125,10 +125,12 @@ const chatRateLimit = rateLimit(20, 60_000);
 
 app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
   const { animal, message, model, history: rawHistory } = req.body ?? {};
-  if (!isAnimalId(animal)) {
+  const resolved = resolveAnimal(animal);
+  if (!resolved) {
     res.status(400).json({ error: `animal must be one of: ${Object.keys(ANIMALS).join(", ")}` });
     return;
   }
+  const character = ANIMALS[resolved.id];
   if (typeof message !== "string" || !message.trim() || message.length > 2000) {
     res.status(400).json({ error: "message must be a non-empty string up to 2000 chars" });
     return;
@@ -143,8 +145,9 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
     return;
   }
   const caller = resolveCaller(req);
-  if (ANIMALS[animal].membersOnly && caller.tier !== "member") {
-    res.status(403).json({ error: `the ${animal} is a members-only animal`, code: "members-only" });
+  if (character.membersOnly && caller.tier !== "member") {
+    const name = resolved.legacy ? `the ${character.species}` : character.name;
+    res.status(403).json({ error: `${name} is a members-only animal`, code: "members-only" });
     return;
   }
   for (const [key, limits] of caller.checks) {
@@ -167,7 +170,8 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
     if (!res.writableFinished) disconnected.abort();
   });
   try {
-    const reply = await askAnimal(animal, message.trim(), {
+    const reply = await askAnimal(resolved.id, message.trim(), {
+      legacy: resolved.legacy,
       budgetKeys: caller.checks.map(([key]) => key),
       history,
       modelOverride: model,
