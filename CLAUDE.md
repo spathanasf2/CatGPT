@@ -724,4 +724,3 @@ foundry only. Once 12 is approved: deploy the server to Hetzner (old builds keep
 legacy mapping), then cut build 13 -- a character-id build can't go out before production knows
 the ids. Build 13 also needs: regenerated App Store screenshots (names now show in the picker and
 placeholder) and review notes updated from "horse, goat and snake" to the new bonus roster.
-\n
