@@ -7,6 +7,7 @@ type Props = {
   onOpenMembership: () => void;
   onOpenPrivacy: () => void;
   onOpenMemories: () => void;
+  onOpenYourAnimals: () => void;
 };
 
 export function SettingsModal({
@@ -16,6 +17,7 @@ export function SettingsModal({
   onOpenMembership,
   onOpenPrivacy,
   onOpenMemories,
+  onOpenYourAnimals,
 }: Props) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -26,6 +28,9 @@ export function SettingsModal({
         </button>
         <button className="settings-row-btn" onClick={onOpenUsage}>
           Usage
+        </button>
+        <button className="settings-row-btn" onClick={onOpenYourAnimals}>
+          Your animals
         </button>
         <button className="settings-row-btn" onClick={onOpenMemories}>
           What they remember

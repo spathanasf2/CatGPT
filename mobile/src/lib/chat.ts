@@ -1,4 +1,5 @@
-import type { AnimalId } from "./animals";
+import type { AnimalRef } from "./animals";
+import { customById, customSpec, isCustomId } from "./custom-animals";
 import type { ChatMessage } from "./chats";
 import { apiHeaders, serverConfigured, SERVER_URL } from "./api";
 
@@ -11,7 +12,8 @@ export type AnimalReply = {
 
 export type HistoryItem =
   | { role: "user"; text: string }
-  | { role: "animal"; animal: AnimalId; sounds: string; narrative: string };
+  // Custom animals carry their name and species -- the server keeps no record of them.
+  | { role: "animal"; animal: AnimalRef; name?: string; species?: string; sounds: string; narrative: string };
 
 // What went wrong, in terms the UI can phrase for a person -- the raw error text ("Load failed",
 // "The operation was aborted.") is never meant to reach the chat.
@@ -46,15 +48,27 @@ export function toHistory(messages: ChatMessage[]): HistoryItem[] {
         : {
             role: "animal" as const,
             animal: m.animal,
+            ...customLabel(m.animal),
             sounds: m.sounds.slice(0, HISTORY_CHARS),
             narrative: m.narrative.slice(0, HISTORY_CHARS),
           },
     );
 }
 
+// A custom animal travels as its full spec; the server builds the prompt from it.
+function customBody(id: AnimalRef): { custom?: ReturnType<typeof customSpec> } {
+  const c = isCustomId(id) ? customById(id) : undefined;
+  return c ? { custom: customSpec(c) } : {};
+}
+
+function customLabel(id: AnimalRef): { name?: string; species?: string } {
+  const c = isCustomId(id) ? customById(id) : undefined;
+  return c ? { name: c.name, species: c.species } : {};
+}
+
 // The server gives its model fallback chain 18s; this leaves room for the network on top.
 export async function askAnimal(
-  animal: AnimalId,
+  animal: AnimalRef,
   message: string,
   history: HistoryItem[],
   memory: string[],
@@ -69,7 +83,7 @@ export async function askAnimal(
       res = await fetch(`${SERVER_URL}/chat`, {
         method: "POST",
         headers: { ...apiHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ animal, message, history, memory }),
+        body: JSON.stringify({ animal, message, history, memory, ...customBody(animal) }),
         signal: ctrl.signal,
       });
     } catch (err) {

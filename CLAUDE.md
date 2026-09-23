@@ -747,3 +747,32 @@ a broken walk promise; Gerald keeps a bread ledger; Kevin remembers nothing, by 
   verbatim before the event had even happened.
 - **Cost:** up to ~12 short notes (~100-250 tokens) on top of history; allowances are token-
   denominated so worst-case dollars don't move, messages-per-allowance drop a bit.
+
+## Custom animals (2026-09-23, members) -- on foundry; TestFlight build 1.0 (13) points at foundry
+Members make their own animals: species, name, she/he/it, four 5-step sliders (energy,
+friendliness, appetite, drama), up to two quirks from a fixed list. **No free-form prompt** (Frank
+agreed): the server writes every word from those choices (`server/src/custom.ts` -- slider
+sentences, quirk sentences, an adjective line like "a hyper, clingy dog", species-default
+vocabulary/triggers). The only user text that reaches the model is the name, validated to
+`CUSTOM_NAME` (letters/digits/space/'.- , 20 max). Rejected-input cases are in
+`test/custom.test.mts`.
+- Stored on-device (`mobile/src/lib/custom-animals.ts`, key `aineko.customAnimals.v1`); every
+  request to one carries its full spec as `custom`, and history items for one carry its name and
+  species (the server keeps no record of them). Ids `custom-<16 hex>`. Quirk ids and the name rule
+  must match between the two files.
+- Members-only on the server (`membersOnly: true` on every custom). Picker: "Your animals" group
+  with "+ Make your own..."; Settings > Your animals (edit / delete). Delete is soft so old
+  messages still render; chats pointed at it fall back to Hayley.
+- Memory works for them unchanged (keyed by id).
+- **Testing the editor in a browser** needs membership, which a browser can't have. The UI test
+  fakes it in the test browser only -- `window.CapacitorCustomPlatform = {name: "ios"}` plus
+  patching the purchase plugin's web fallback (`getPurchases` returns `{purchases:[]}`) to report
+  an active subscription. No test hooks in the app. The server still refuses that fake
+  membership, which doubles as a check of the server-side gate.
+
+**Build 1.0 (13) is a TestFlight-only build pointed at foundry's tailnet server**, so Frank can try
+characters + memory + custom animals while build 12 is still in App Review against production
+(production can't take these server changes mid-review). Never submit 13. The Mac's
+`.env.local` was switched to the tailnet values for it and switched back to production right after
+(production values saved at `~/aineko-build/env.local.production` on the Mac). The first build
+submitted with these features must be built against production after the Hetzner deploy.

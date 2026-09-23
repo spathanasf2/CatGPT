@@ -1,4 +1,4 @@
-import type { AnimalId } from "./animals";
+import type { AnimalRef } from "./animals";
 
 // What each character remembers about this person, across all chats with them: short notes the
 // animal wrote itself (the reply's "remember" field), sent back with every message to that animal.
@@ -8,7 +8,7 @@ const KEY = "aineko.memories.v1";
 export const MEMORY_LIMIT = 12;
 
 export type MemoryNote = { text: string; at: number };
-type Memories = Partial<Record<AnimalId, MemoryNote[]>>;
+type Memories = Partial<Record<AnimalRef, MemoryNote[]>>;
 
 function load(): Memories {
   try {
@@ -31,11 +31,11 @@ export function allMemories(): Memories {
   return load();
 }
 
-export function memoriesFor(animal: AnimalId): string[] {
+export function memoriesFor(animal: AnimalRef): string[] {
   return (load()[animal] ?? []).map((n) => n.text);
 }
 
-export function rememberFor(animal: AnimalId, text: string): void {
+export function rememberFor(animal: AnimalRef, text: string): void {
   const memories = load();
   const notes = memories[animal] ?? [];
   // The server already drops reworded repeats; this only catches an exact one.

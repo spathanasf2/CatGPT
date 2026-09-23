@@ -17,7 +17,8 @@ export type AnimalId =
   | "noodle";
 
 export type Animal = {
-  id: AnimalId;
+  // An AnimalId for the built-ins; "custom-..." for animals people make (see custom.ts).
+  id: string;
   name: string;
   species: SpeciesId;
   // Follows the name in the prompt: "Hayley, a small, slight gray cat".

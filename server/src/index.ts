@@ -2,7 +2,8 @@ import express from "express";
 import { bearerAuth } from "./auth.js";
 import { log } from "./log.js";
 import { askAnimal } from "./openrouter.js";
-import { ANIMALS, resolveAnimal } from "./animals.js";
+import { ANIMALS, resolveAnimal, type Animal } from "./animals.js";
+import { customAnimal, parseCustom } from "./custom.js";
 import { parseHistory, parseMemory } from "./history.js";
 import { MODELS, isAllowedModel } from "./models.js";
 import { getUsage } from "./usage.js";
@@ -124,13 +125,26 @@ app.get("/usage/me", bearerAuth(TOKEN), (req, res) => {
 const chatRateLimit = rateLimit(20, 60_000);
 
 app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
-  const { animal, message, model, history: rawHistory, memory: rawMemory } = req.body ?? {};
-  const resolved = resolveAnimal(animal);
-  if (!resolved) {
-    res.status(400).json({ error: `animal must be one of: ${Object.keys(ANIMALS).join(", ")}` });
-    return;
+  const { animal, custom: rawCustom, message, model, history: rawHistory, memory: rawMemory } = req.body ?? {};
+  // Either a built-in (by id) or a custom animal the app describes in full (members only).
+  let character: Animal;
+  let legacy = false;
+  if (rawCustom !== undefined) {
+    const spec = parseCustom(rawCustom);
+    if (!spec || spec.id !== animal) {
+      res.status(400).json({ error: "custom animal is invalid" });
+      return;
+    }
+    character = customAnimal(spec);
+  } else {
+    const resolved = resolveAnimal(animal);
+    if (!resolved) {
+      res.status(400).json({ error: `animal must be one of: ${Object.keys(ANIMALS).join(", ")}` });
+      return;
+    }
+    character = ANIMALS[resolved.id];
+    legacy = resolved.legacy;
   }
-  const character = ANIMALS[resolved.id];
   if (typeof message !== "string" || !message.trim() || message.length > 2000) {
     res.status(400).json({ error: "message must be a non-empty string up to 2000 chars" });
     return;
@@ -151,7 +165,7 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
   }
   const caller = resolveCaller(req);
   if (character.membersOnly && caller.tier !== "member") {
-    const name = resolved.legacy ? `the ${character.species}` : character.name;
+    const name = legacy ? `the ${character.species}` : character.name;
     res.status(403).json({ error: `${name} is a members-only animal`, code: "members-only" });
     return;
   }
@@ -175,8 +189,8 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
     if (!res.writableFinished) disconnected.abort();
   });
   try {
-    const reply = await askAnimal(resolved.id, message.trim(), {
-      legacy: resolved.legacy,
+    const reply = await askAnimal(character, message.trim(), {
+      legacy,
       memory,
       budgetKeys: caller.checks.map(([key]) => key),
       history,

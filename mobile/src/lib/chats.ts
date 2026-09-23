@@ -1,4 +1,4 @@
-import { ANIMALS, normalizeAnimalId, type AnimalId } from "./animals";
+import { ANIMALS, normalizeAnimalId, type AnimalRef } from "./animals";
 import { newId } from "./ids";
 
 export type ChatMessage =
@@ -6,7 +6,7 @@ export type ChatMessage =
   | {
       id: string;
       role: "animal";
-      animal: AnimalId;
+      animal: AnimalRef;
       sounds: string;
       narrative: string;
       // The memory this reply created, if any -- shown under the bubble.
@@ -17,7 +17,7 @@ export type ChatMessage =
       id: string;
       role: "error";
       text: string;
-      animal?: AnimalId;
+      animal?: AnimalRef;
       retryable?: boolean;
       // Offer a way out of the error besides retrying (quota / members-only -> Membership).
       action?: "membership";
@@ -27,7 +27,7 @@ export type Chat = {
   id: string;
   // Who the dropdown currently points at -- new messages go to this animal, but past
   // "animal" messages carry their own `animal` so switching mid-chat doesn't relabel history.
-  animal: AnimalId;
+  animal: AnimalRef;
   title: string;
   messages: ChatMessage[];
   createdAt: number;
@@ -63,7 +63,7 @@ export function loadChats(): Chat[] {
 // Builds 1.0 (1)-(12) stored species ids ("cat"); characters replaced them (2026-09-23). Rewritten
 // on load, so the rest of the app only ever sees character ids.
 function migrateAnimals(chat: Chat): Chat {
-  const fix = (id: unknown): AnimalId => normalizeAnimalId(id) ?? ANIMALS[0]!.id;
+  const fix = (id: unknown): AnimalRef => normalizeAnimalId(id) ?? ANIMALS[0]!.id;
   return {
     ...chat,
     animal: fix(chat.animal),
@@ -81,7 +81,7 @@ export function saveChats(chats: Chat[]): void {
   }
 }
 
-export function newChat(animal: AnimalId): Chat {
+export function newChat(animal: AnimalRef): Chat {
   return {
     id: newId(),
     animal,

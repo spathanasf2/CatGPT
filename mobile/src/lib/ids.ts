@@ -1,6 +1,6 @@
 // crypto.randomUUID needs iOS 15.4+ and the deployment target is 15.0; getRandomValues works on
 // every iOS this app runs on.
-function randomHex(bytes: number): string {
+export function randomHex(bytes: number): string {
   return Array.from(crypto.getRandomValues(new Uint8Array(bytes)), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 

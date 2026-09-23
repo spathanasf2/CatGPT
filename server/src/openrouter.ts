@@ -1,5 +1,5 @@
-import type { Animal, AnimalId } from "./animals.js";
-import { ANIMALS } from "./animals.js";
+import type { Animal } from "./animals.js";
+import { ANIMALS, type AnimalId } from "./animals.js";
 import type { HistoryItem } from "./history.js";
 import { kidSafe } from "./kid-safe.js";
 import { isKnownNote } from "./memory-notes.js";
@@ -118,7 +118,8 @@ function buildMessages(
     else if (item.animal === animal.id)
       push("assistant", JSON.stringify({ sounds: kidSafe(item.sounds), narrative: kidSafe(item.narrative) }));
     else {
-      const other = ANIMALS[item.animal];
+      const known = Object.prototype.hasOwnProperty.call(ANIMALS, item.animal) ? ANIMALS[item.animal as AnimalId] : null;
+      const other = known ?? { name: item.name ?? "another animal", species: item.species ?? "animal" };
       const label = legacy ? `The ${other.species}` : `${other.name} the ${other.species}`;
       push("user", `[${label} reacted: ${kidSafe(item.sounds)} ${kidSafe(item.narrative)}]`);
     }
@@ -231,13 +232,12 @@ export type AskOptions = {
 };
 
 export async function askAnimal(
-  animalId: AnimalId,
+  animal: Animal,
   message: string,
   { budgetKeys, legacy = false, history = [], memory, modelOverride, signal }: AskOptions,
 ): Promise<AnimalReply> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured");
-  const animal = ANIMALS[animalId];
   const messages = buildMessages(animal, legacy, history, memory, message);
 
   const primary = modelOverride || process.env.OPENROUTER_MODEL || MODELS[0]!.id;

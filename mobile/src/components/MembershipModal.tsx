@@ -28,6 +28,7 @@ function Perks() {
       <li>
         {BONUS.map((a) => a.emoji).join(" ")} Bonus animals: {BONUS.map((a) => `${a.name} the ${a.species}`).join(", ")}
       </li>
+      <li>Make your own animals: pick the species, name, and personality</li>
       <li>About 10&times; the free chat allowance</li>
     </ul>
   );

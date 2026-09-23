@@ -1,3 +1,5 @@
+import { customById, customMeta, isCustomId, type CustomId } from "./custom-animals";
+
 // Characters, not species (2026-09-23) -- see server/src/animals.ts for the personalities. Keep ids,
 // order, and membersOnly in sync with the server; this file only holds what the UI draws.
 export type AnimalId =
@@ -13,8 +15,11 @@ export type AnimalId =
   | "barbara"
   | "noodle";
 
+// A built-in character, or one the person made (custom-animals.ts).
+export type AnimalRef = AnimalId | CustomId;
+
 export type AnimalMeta = {
-  id: AnimalId;
+  id: AnimalRef;
   name: string;
   species: string;
   emoji: string;
@@ -22,6 +27,7 @@ export type AnimalMeta = {
   thinking: string;
   // Unlocked by membership (the server enforces this too -- server/src/animals.ts).
   membersOnly?: boolean;
+  custom?: boolean;
 };
 
 export const ANIMALS: AnimalMeta[] = [
@@ -52,15 +58,18 @@ const LEGACY_IDS: Record<string, AnimalId> = {
   snake: "noodle",
 };
 
-export function normalizeAnimalId(id: unknown): AnimalId | null {
+export function normalizeAnimalId(id: unknown): AnimalRef | null {
   if (typeof id !== "string") return null;
   if (ANIMALS.some((a) => a.id === id)) return id as AnimalId;
+  if (isCustomId(id) && customById(id)) return id;
   return LEGACY_IDS[id] ?? null;
 }
 
 // Never throws: an id this build doesn't know (say, a character a newer build added, synced back
 // somehow) falls back to the first animal rather than taking the whole chat view down.
-export function animalById(id: AnimalId): AnimalMeta {
+export function animalById(id: AnimalRef): AnimalMeta {
+  const custom = isCustomId(id) ? customById(id) : undefined;
+  if (custom) return customMeta(custom);
   const canonical = normalizeAnimalId(id);
   return ANIMALS.find((a) => a.id === canonical) ?? ANIMALS[0]!;
 }

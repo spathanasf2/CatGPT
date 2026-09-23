@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { ANIMALS, animalById, type AnimalId } from "@/lib/animals";
+import { ANIMALS, animalById, type AnimalRef } from "@/lib/animals";
 import { askAnimal, toHistory, ChatError, type ChatErrorKind, type HistoryItem } from "@/lib/chat";
 import {
   loadChats,
@@ -18,6 +18,13 @@ import { newId } from "@/lib/ids";
 import { grantConsent, loadConsent, revokeConsent } from "@/lib/consent";
 import { refreshMembership } from "@/lib/membership";
 import { memoriesFor, rememberFor } from "@/lib/memory";
+import {
+  deleteCustomAnimal,
+  loadCustomAnimals,
+  saveCustomAnimal,
+  speciesOption,
+  type CustomAnimal,
+} from "@/lib/custom-animals";
 import { Sidebar } from "@/components/Sidebar";
 import { SettingsModal } from "@/components/SettingsModal";
 import { UsageModal } from "@/components/UsageModal";
@@ -25,8 +32,13 @@ import { MembershipModal } from "@/components/MembershipModal";
 import { BootScreen } from "@/components/BootScreen";
 import { ConsentModal } from "@/components/ConsentModal";
 import { MemoriesModal } from "@/components/MemoriesModal";
+import { CreateAnimalModal } from "@/components/CreateAnimalModal";
+import { YourAnimalsModal } from "@/components/YourAnimalsModal";
 
-const DEFAULT_ANIMAL: AnimalId = ANIMALS[0]!.id;
+// Value of the picker's "Make your own..." entry -- opens the editor instead of switching animals.
+const CREATE_ANIMAL = "__create__";
+
+const DEFAULT_ANIMAL: AnimalRef = ANIMALS[0]!.id;
 
 // Framed as suggestions ("try saying hi"), not literal messages -- the label is what's shown,
 // `message` is what actually gets sent when tapped, since the two shouldn't always be the same
@@ -58,7 +70,7 @@ function formatDay(iso: string): string {
 
 // Phrased as a stage direction like every other animal line. The raw error is for the console,
 // not for the person chatting.
-function errorMessage(err: unknown, animal: AnimalId): ChatMessage {
+function errorMessage(err: unknown, animal: AnimalRef): ChatMessage {
   console.warn("chat request failed", err);
   const name = animalById(animal).name;
   const kind: ChatErrorKind = err instanceof ChatError ? err.kind : "unavailable";
@@ -100,6 +112,10 @@ export default function Home() {
   const [showUsage, setShowUsage] = useState(false);
   const [showMembership, setShowMembership] = useState(false);
   const [showMemories, setShowMemories] = useState(false);
+  const [showYourAnimals, setShowYourAnimals] = useState(false);
+  // The animal being edited, "new" for a fresh one, or null when the editor is closed.
+  const [editingAnimal, setEditingAnimal] = useState<CustomAnimal | "new" | null>(null);
+  const [customAnimals, setCustomAnimals] = useState<CustomAnimal[]>([]);
   // "ask" on first launch (or on a send without permission), "review" from Settings.
   const [consentMode, setConsentMode] = useState<"ask" | "review" | null>(null);
   const [consentedAt, setConsentedAt] = useState<string | null>(null);
@@ -110,7 +126,7 @@ export default function Home() {
   // Chats currently awaiting a reply, and which animal is doing the thinking. Per chat, so a
   // pending reply in one chat doesn't show its thinking bubble in (or lock the composer of)
   // whichever chat you switch to meanwhile.
-  const [pending, setPending] = useState<Record<string, AnimalId>>({});
+  const [pending, setPending] = useState<Record<string, AnimalRef>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -119,6 +135,7 @@ export default function Home() {
     setChats(initial);
     setActiveChatId(activeId);
     setConsentedAt(loadConsent());
+    setCustomAnimals(loadCustomAnimals());
     setHydrated(true);
   }, []);
 
@@ -222,7 +239,7 @@ export default function Home() {
     setActiveChatId(activeId);
   }
 
-  function handleAnimalChange(animal: AnimalId) {
+  function handleAnimalChange(animal: AnimalRef) {
     if (!activeChat) return;
     const id = activeChat.id;
     setChats((prev) => prev.map((c) => (c.id === id ? { ...c, animal } : c)));
@@ -254,7 +271,12 @@ export default function Home() {
     setConsentedAt(null);
   }
 
-  function handleAnimalPick(animal: AnimalId) {
+  function handleAnimalPick(animal: AnimalRef | typeof CREATE_ANIMAL) {
+    if (animal === CREATE_ANIMAL) {
+      if (member) setEditingAnimal("new");
+      else setShowMembership(true);
+      return;
+    }
     if (animalById(animal).membersOnly && !member) {
       setShowMembership(true);
       return;
@@ -262,7 +284,31 @@ export default function Home() {
     handleAnimalChange(animal);
   }
 
-  async function requestReply(chatId: string, animal: AnimalId, text: string, history: HistoryItem[]) {
+  // A brand-new animal becomes who the current chat is talking to, and the keyboard comes up --
+  // this runs inside the Save tap, so focusing still counts as part of the gesture (see
+  // focusComposerNow).
+  function handleSaveAnimal(animal: CustomAnimal) {
+    const isNew = editingAnimal === "new";
+    saveCustomAnimal(animal);
+    flushSync(() => {
+      setCustomAnimals(loadCustomAnimals());
+      setEditingAnimal(null);
+      if (isNew) {
+        setShowYourAnimals(false);
+        handleAnimalChange(animal.id);
+      }
+    });
+    if (isNew) focusComposerNow();
+  }
+
+  // Soft delete: past messages from it still render. Chats pointed at it fall back to the default.
+  function handleDeleteAnimal(animal: CustomAnimal) {
+    deleteCustomAnimal(animal.id);
+    setCustomAnimals(loadCustomAnimals());
+    setChats((prev) => prev.map((c) => (c.animal === animal.id ? { ...c, animal: DEFAULT_ANIMAL } : c)));
+  }
+
+  async function requestReply(chatId: string, animal: AnimalRef, text: string, history: HistoryItem[]) {
     setPending((prev) => ({ ...prev, [chatId]: animal }));
     try {
       const reply = await askAnimal(animal, text, history, memoriesFor(animal));
@@ -362,7 +408,7 @@ export default function Home() {
             <select
               className="animal-select"
               value={activeChat.animal}
-              onChange={(e) => handleAnimalPick(e.target.value as AnimalId)}
+              onChange={(e) => handleAnimalPick(e.target.value as AnimalRef | typeof CREATE_ANIMAL)}
             >
               {ANIMALS.filter((a) => !a.membersOnly).map((a) => (
                 <option key={a.id} value={a.id}>
@@ -377,6 +423,16 @@ export default function Home() {
                     {a.emoji} {a.name}
                   </option>
                 ))}
+              </optgroup>
+              <optgroup label="Your animals">
+                {customAnimals
+                  .filter((a) => !a.deleted)
+                  .map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {speciesOption(a.species).emoji} {a.name}
+                    </option>
+                  ))}
+                <option value={CREATE_ANIMAL}>{"\uFF0B"} Make your own...</option>
               </optgroup>
             </select>
           ) : (
@@ -522,6 +578,10 @@ export default function Home() {
             setShowSettings(false);
             setShowMemories(true);
           }}
+          onOpenYourAnimals={() => {
+            setShowSettings(false);
+            setShowYourAnimals(true);
+          }}
         />
       )}
       {showUsage && (
@@ -534,6 +594,27 @@ export default function Home() {
         />
       )}
       {showMemories && <MemoriesModal onClose={() => setShowMemories(false)} />}
+      {showYourAnimals && (
+        <YourAnimalsModal
+          animals={customAnimals}
+          member={member}
+          onCreate={() => setEditingAnimal("new")}
+          onEdit={(a) => setEditingAnimal(a)}
+          onDelete={handleDeleteAnimal}
+          onOpenMembership={() => {
+            setShowYourAnimals(false);
+            setShowMembership(true);
+          }}
+          onClose={() => setShowYourAnimals(false)}
+        />
+      )}
+      {editingAnimal && (
+        <CreateAnimalModal
+          initial={editingAnimal === "new" ? null : editingAnimal}
+          onSave={handleSaveAnimal}
+          onClose={() => setEditingAnimal(null)}
+        />
+      )}
       {showMembership && <MembershipModal onClose={() => setShowMembership(false)} onMembershipChange={setMember} />}
       {consentMode && (
         <ConsentModal

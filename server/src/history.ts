@@ -1,8 +1,11 @@
-import { resolveAnimal, type AnimalId } from "./animals.js";
+import { resolveAnimal, type SpeciesId } from "./animals.js";
+import { CUSTOM_ID, CUSTOM_NAME, SPECIES } from "./custom.js";
 
 export type HistoryItem =
   | { role: "user"; text: string }
-  | { role: "animal"; animal: AnimalId; sounds: string; narrative: string };
+  // `animal` is a built-in AnimalId or a custom id; custom ones carry their own name and species,
+  // since the server keeps no record of them.
+  | { role: "animal"; animal: string; name?: string; species?: SpeciesId; sounds: string; narrative: string };
 
 // Only the tail of a conversation is worth sending -- enough for a name or a running bit to carry
 // over, without letting prompt cost grow with chat length. The client already trims to this; the
@@ -30,15 +33,25 @@ export function parseHistory(raw: unknown): HistoryItem[] | null {
     const e = entry as Record<string, unknown>;
     if (e.role === "user" && typeof e.text === "string") {
       items.push({ role: "user", text: clip(e.text) });
-    } else if (
-      e.role === "animal" &&
-      resolveAnimal(e.animal) &&
-      typeof e.sounds === "string" &&
-      typeof e.narrative === "string"
-    ) {
-      // Species ids (older builds) map to their default character.
-      const animal = resolveAnimal(e.animal)!.id;
-      items.push({ role: "animal", animal, sounds: clip(e.sounds), narrative: clip(e.narrative) });
+    } else if (e.role === "animal" && typeof e.sounds === "string" && typeof e.narrative === "string") {
+      const builtIn = resolveAnimal(e.animal);
+      const sounds = clip(e.sounds);
+      const narrative = clip(e.narrative);
+      if (builtIn) {
+        // Species ids (older builds) map to their default character.
+        items.push({ role: "animal", animal: builtIn.id, sounds, narrative });
+      } else if (
+        typeof e.animal === "string" &&
+        CUSTOM_ID.test(e.animal) &&
+        typeof e.name === "string" &&
+        CUSTOM_NAME.test(e.name.trim()) &&
+        typeof e.species === "string" &&
+        Object.prototype.hasOwnProperty.call(SPECIES, e.species)
+      ) {
+        items.push({ role: "animal", animal: e.animal, name: e.name.trim(), species: e.species as SpeciesId, sounds, narrative });
+      } else {
+        return null;
+      }
     } else {
       return null;
     }
