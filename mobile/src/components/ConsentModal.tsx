@@ -19,10 +19,12 @@ export function ConsentModal({ mode, consentedAt, onAllow, onRevoke, onClose }: 
         <h2>{mode === "ask" ? "\u{1F43E} Before you start" : "AI & privacy"}</h2>
         <p className="modal-text">
           Aineko&apos;s animals are powered by a third-party AI service. What you type, along with the last few
-          messages of that chat so the animal can follow along, is sent through our server to OpenRouter and an
-          AI model to generate each reply.
+          messages of that chat and the handful of things that animal remembers about you, is sent through our
+          server to OpenRouter and an AI model to generate each reply.
         </p>
-        <p className="modal-text">We don&apos;t store your messages, and your chat history stays on this device.</p>
+        <p className="modal-text">
+          We don&apos;t store your messages. Your chat history, and what each animal remembers, stay on this device.
+        </p>
         <p className="modal-links">
           <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer">
             Privacy Policy

@@ -724,3 +724,26 @@ foundry only. Once 12 is approved: deploy the server to Hetzner (old builds keep
 legacy mapping), then cut build 13 -- a character-id build can't go out before production knows
 the ids. Build 13 also needs: regenerated App Store screenshots (names now show in the picker and
 placeholder) and review notes updated from "horse, goat and snake" to the new bonus roster.
+
+## Memory (2026-09-23) -- on foundry with characters; same deploy hold
+Each character remembers things about the person across all chats with them, shaped by
+personality -- the joke is animals remembering the *wrong* things (Koba forgets your name but never
+a broken walk promise; Gerald keeps a bread ledger; Kevin remembers nothing, by design).
+- **Mechanism:** the reply JSON gets an optional `remember` note, requested only when the app sends
+  a `memory` array (older builds never do, so their prompt is unchanged). The app keeps notes per
+  character in localStorage (`lib/memory.ts`, key `aineko.memories.v1`, last 12 per character) and
+  sends them with every message to that character. Device-local like chats -- the server stores
+  nothing, which keeps the privacy policy true (its text was updated to say memories are sent and
+  kept on-device). Per-character `remembers` text lives in `server/src/animals.ts` (null = none).
+- **UI:** "Koba will remember: ..." under a reply that created a note; Settings > What they
+  remember lists every note and has Forget everything. Consent sheet text mentions memories.
+- **Tuning, measured (`server/scripts/memory-callbacks.mts`):** with the memory list up in the
+  system prompt the model almost never used it (2/20 next-day callbacks). Moving the list into a
+  bracketed "[Koba remembers: ...]" note right before the latest message, plus wording that asks for
+  memories to show in behavior "especially at a greeting", got ~15/20. Invented notes during
+  ordinary chat: 0/20. The model re-issues existing memories reworded, so `src/memory-notes.ts`
+  drops a note whose meaningful words mostly overlap an existing one (tested with the real
+  rewordings it produced). Don't put a concrete example note in the prompt -- the model copied it
+  verbatim before the event had even happened.
+- **Cost:** up to ~12 short notes (~100-250 tokens) on top of history; allowances are token-
+  denominated so worst-case dollars don't move, messages-per-allowance drop a bit.

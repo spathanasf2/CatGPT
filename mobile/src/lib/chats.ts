@@ -3,7 +3,15 @@ import { newId } from "./ids";
 
 export type ChatMessage =
   | { id: string; role: "user"; text: string }
-  | { id: string; role: "animal"; animal: AnimalId; sounds: string; narrative: string }
+  | {
+      id: string;
+      role: "animal";
+      animal: AnimalId;
+      sounds: string;
+      narrative: string;
+      // The memory this reply created, if any -- shown under the bubble.
+      remembered?: string;
+    }
   // `animal` / `retryable` / `action` are absent on errors saved by builds 1.0 (1)-(9).
   | {
       id: string;

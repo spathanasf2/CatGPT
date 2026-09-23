@@ -301,6 +301,31 @@ select {
   border-bottom-left-radius: 4px;
 }
 
+/* "Koba will remember: ..." under a reply that created a memory. */
+.remembered {
+  margin-top: 7px;
+  font-size: 12px;
+  color: #7d7a88;
+}
+
+.memory-scroll {
+  max-height: 50vh;
+  overflow-y: auto;
+  margin-bottom: 8px;
+}
+
+.memory-group {
+  margin-bottom: 12px;
+}
+
+.memory-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #cfcdd6;
+}
+
 .retry-btn {
   display: block;
   margin-top: 8px;

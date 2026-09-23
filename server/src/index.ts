@@ -3,7 +3,7 @@ import { bearerAuth } from "./auth.js";
 import { log } from "./log.js";
 import { askAnimal } from "./openrouter.js";
 import { ANIMALS, resolveAnimal } from "./animals.js";
-import { parseHistory } from "./history.js";
+import { parseHistory, parseMemory } from "./history.js";
 import { MODELS, isAllowedModel } from "./models.js";
 import { getUsage } from "./usage.js";
 import { landingHtml, privacyHtml, termsHtml } from "./pages.js";
@@ -124,7 +124,7 @@ app.get("/usage/me", bearerAuth(TOKEN), (req, res) => {
 const chatRateLimit = rateLimit(20, 60_000);
 
 app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
-  const { animal, message, model, history: rawHistory } = req.body ?? {};
+  const { animal, message, model, history: rawHistory, memory: rawMemory } = req.body ?? {};
   const resolved = resolveAnimal(animal);
   if (!resolved) {
     res.status(400).json({ error: `animal must be one of: ${Object.keys(ANIMALS).join(", ")}` });
@@ -142,6 +142,11 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
   const history = parseHistory(rawHistory);
   if (!history) {
     res.status(400).json({ error: "history must be an array of up to 20 prior user/animal messages" });
+    return;
+  }
+  const memory = parseMemory(rawMemory);
+  if (memory === null) {
+    res.status(400).json({ error: "memory must be an array of up to 20 strings" });
     return;
   }
   const caller = resolveCaller(req);
@@ -172,6 +177,7 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
   try {
     const reply = await askAnimal(resolved.id, message.trim(), {
       legacy: resolved.legacy,
+      memory,
       budgetKeys: caller.checks.map(([key]) => key),
       history,
       modelOverride: model,

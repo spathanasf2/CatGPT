@@ -45,3 +45,19 @@ export function parseHistory(raw: unknown): HistoryItem[] | null {
   }
   return items.slice(-MAX_ITEMS);
 }
+
+// What the app sends as this character's memory -- short notes it wrote itself in earlier replies
+// (the "remember" field), kept on the device. Same trust rules as history: re-clipped and capped.
+const MAX_MEMORIES = 12;
+const MAX_MEMORY_CHARS = 120;
+
+/** undefined = the app predates memory (don't ask the model for notes); null = malformed. */
+export function parseMemory(raw: unknown): string[] | undefined | null {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw) || raw.length > MAX_ACCEPTED) return null;
+  if (!raw.every((m) => typeof m === "string")) return null;
+  return (raw as string[])
+    .map((m) => m.trim().slice(0, MAX_MEMORY_CHARS))
+    .filter(Boolean)
+    .slice(-MAX_MEMORIES);
+}

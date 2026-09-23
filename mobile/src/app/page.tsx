@@ -17,12 +17,14 @@ import { useViewportHeight } from "@/lib/use-viewport-height";
 import { newId } from "@/lib/ids";
 import { grantConsent, loadConsent, revokeConsent } from "@/lib/consent";
 import { refreshMembership } from "@/lib/membership";
+import { memoriesFor, rememberFor } from "@/lib/memory";
 import { Sidebar } from "@/components/Sidebar";
 import { SettingsModal } from "@/components/SettingsModal";
 import { UsageModal } from "@/components/UsageModal";
 import { MembershipModal } from "@/components/MembershipModal";
 import { BootScreen } from "@/components/BootScreen";
 import { ConsentModal } from "@/components/ConsentModal";
+import { MemoriesModal } from "@/components/MemoriesModal";
 
 const DEFAULT_ANIMAL: AnimalId = ANIMALS[0]!.id;
 
@@ -97,6 +99,7 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [showUsage, setShowUsage] = useState(false);
   const [showMembership, setShowMembership] = useState(false);
+  const [showMemories, setShowMemories] = useState(false);
   // "ask" on first launch (or on a send without permission), "review" from Settings.
   const [consentMode, setConsentMode] = useState<"ask" | "review" | null>(null);
   const [consentedAt, setConsentedAt] = useState<string | null>(null);
@@ -262,8 +265,16 @@ export default function Home() {
   async function requestReply(chatId: string, animal: AnimalId, text: string, history: HistoryItem[]) {
     setPending((prev) => ({ ...prev, [chatId]: animal }));
     try {
-      const reply = await askAnimal(animal, text, history);
-      appendMessage(chatId, { id: newId(), role: "animal", animal, ...reply });
+      const reply = await askAnimal(animal, text, history, memoriesFor(animal));
+      if (reply.remember) rememberFor(animal, reply.remember);
+      appendMessage(chatId, {
+        id: newId(),
+        role: "animal",
+        animal,
+        sounds: reply.sounds,
+        narrative: reply.narrative,
+        ...(reply.remember ? { remembered: reply.remember } : {}),
+      });
     } catch (err) {
       appendMessage(chatId, errorMessage(err, animal));
     } finally {
@@ -420,6 +431,11 @@ export default function Home() {
                         {speaker.emoji} {m.sounds}
                       </div>
                       <div className="narrative">{m.narrative}</div>
+                      {m.remembered && (
+                        <div className="remembered">
+                          {"\u{1F4AD}"} {speaker.name} will remember: {m.remembered}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -502,6 +518,10 @@ export default function Home() {
             setShowSettings(false);
             setConsentMode("review");
           }}
+          onOpenMemories={() => {
+            setShowSettings(false);
+            setShowMemories(true);
+          }}
         />
       )}
       {showUsage && (
@@ -513,6 +533,7 @@ export default function Home() {
           }}
         />
       )}
+      {showMemories && <MemoriesModal onClose={() => setShowMemories(false)} />}
       {showMembership && <MembershipModal onClose={() => setShowMembership(false)} onMembershipChange={setMember} />}
       {consentMode && (
         <ConsentModal

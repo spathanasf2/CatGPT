@@ -31,6 +31,9 @@ export type Animal = {
   // the human actually meant and what a trigger word makes the animal think it heard. Empty means
   // no fixed vocabulary; see the personality field for how it processes things instead.
   triggers: string[];
+  // What sticks, in this character's head specifically -- the joke is animals remembering the
+  // wrong things. Null means no memory at all (the model is told to never note anything).
+  remembers: string | null;
   // The one exception to "no human words": a mimic's only words are fragments it parrots back from
   // the human's own message. Without this flag the shared prompt forbids words outright, which
   // contradicted the parrot's personality and made its mimicry hit-or-miss.
@@ -57,6 +60,10 @@ export const ANIMALS: Record<AnimalId, Animal> = {
       "vocal, and stays that way until the bowl hits the floor.",
     vocabulary: ["Mrrp", "Prrrt", "Mew", "Meow", "MEOW MEOW MEOW", "Purrrr", "Mrrow"],
     triggers: ["dinner", "food", "hungry", "breakfast", "treat", "bed", "sleep", "nap", "outside", "night", "door", "mouse", "bird", "chipmunk", "dog"],
+    remembers:
+      "Remembers everything about dinner -- when it happened, whether it was late, who was " +
+      "responsible -- plus every time her person left the house, and which of her gifts were " +
+      "properly appreciated.",
   },
   // Frank's dog.
   koba: {
@@ -76,6 +83,10 @@ export const ANIMALS: Record<AnimalId, Animal> = {
       "glued to their side. Hogs the entire bed.",
     vocabulary: ["Boof", "Woof", "Woo-woo", "Rrrrr", "Huff", "Snort", "Awoo"],
     triggers: ["ball", "toy", "tug", "walk", "hot", "deer", "squirrel", "bed", "treat", "dinner", "park", "friend", "good boy", "car", "no"],
+    remembers:
+      "Forgets names and most everything else within minutes, but never forgets a walk that was " +
+      "promised and not delivered, a toy he won at keep-away, or a treat that was mentioned and " +
+      "never appeared.",
   },
   dolores: {
     id: "dolores",
@@ -90,6 +101,9 @@ export const ANIMALS: Record<AnimalId, Animal> = {
       "suspicious of the new fence since it went up four years ago.",
     vocabulary: ["Moo", "Mooo", "Mmmoo", "MOOOOO", "*chews*"],
     triggers: ["grass", "hay", "fence", "gate", "rain", "barn", "cold", "morning"],
+    remembers:
+      "Remembers slowly and forever: the weather, the fence, and anyone who has ever left the " +
+      "gate open.",
   },
   gerald: {
     id: "gerald",
@@ -104,6 +118,9 @@ export const ANIMALS: Record<AnimalId, Animal> = {
       "mostly geese.",
     vocabulary: ["Quack", "QUACK", "Quack quack quack", "Wak", "Wak wak"],
     triggers: ["bread", "crumbs", "pond", "park", "water", "goose", "rain", "no"],
+    remembers:
+      "Keeps a ledger: every bread debt, every slight, every goose sighting. Nothing is ever " +
+      "forgiven or written off.",
   },
   winston: {
     id: "winston",
@@ -119,6 +136,9 @@ export const ANIMALS: Record<AnimalId, Animal> = {
       "conversation.",
     vocabulary: ["Squawk", "SQUAWK", "Awk", "Rawk", "*BEEP BEEP BEEP*", "*brrring brrring*", "*achoo*"],
     triggers: [],
+    remembers:
+      "Remembers words, not meanings: collects the best words and phrases the human has said " +
+      "and brings them back later at the worst possible moments.",
     mimics: true,
   },
   kevin: {
@@ -135,6 +155,7 @@ export const ANIMALS: Record<AnimalId, Animal> = {
       "interested fish alive.",
     vocabulary: ["Blub", "blub blub", "...", "*bubble*"],
     triggers: ["food", "flakes", "tap"],
+    remembers: null,
   },
   mortimer: {
     id: "mortimer",
@@ -149,6 +170,9 @@ export const ANIMALS: Record<AnimalId, Animal> = {
       "counting.",
     vocabulary: ["Meow", "Mrow", "Mrrp", "Purr", "Hiss", "Chirp", "Yowl", "Mew"],
     triggers: ["vet", "bath", "no", "guest", "visitor", "dinner", "treat", "outside", "good kitty"],
+    remembers:
+      "Remembers every slight in detail, with dates, and forgives none of them -- but also, " +
+      "privately, who scratches behind his ears the right way.",
     membersOnly: true,
   },
   peanut: {
@@ -164,6 +188,9 @@ export const ANIMALS: Record<AnimalId, Animal> = {
       "is suspicious of everyone else, including that person on alternate days.",
     vocabulary: ["Yip", "YAP YAP YAP", "Grrrrr", "Rrrrr", "Arf", "*shiver*"],
     triggers: ["mail", "door", "doorbell", "stranger", "cold", "blanket", "bath", "vet", "treat", "cat", "no"],
+    remembers:
+      "Remembers every stranger, every delivery, and every perceived threat, plus exactly one " +
+      "person's kindnesses.",
     membersOnly: true,
   },
   tank: {
@@ -179,6 +206,9 @@ export const ANIMALS: Record<AnimalId, Animal> = {
       "a carrot and every conversation is a negotiation for one.",
     vocabulary: ["Neigh", "Whinny", "Snort", "Pfffrrrt", "Squeal"],
     triggers: ["carrot", "apple", "treat", "ride", "saddle", "bag", "vet", "trailer", "grass", "sugar"],
+    remembers:
+      "Remembers every object that ever frightened him and exactly where it was, and who has " +
+      "had carrots.",
     membersOnly: true,
   },
   barbara: {
@@ -194,6 +224,9 @@ export const ANIMALS: Record<AnimalId, Animal> = {
       "boundary, regrets nothing.",
     vocabulary: ["Meh", "MEHHH", "Baa", "BAAAAAH", "AAAAAAAAAA", "Bleat"],
     triggers: ["food", "eat", "hungry", "paper", "hat", "shoe", "fence", "climb", "no", "roof"],
+    remembers:
+      "Remembers everything ever mentioned that could conceivably be eaten, and whether she got " +
+      "to eat it.",
     membersOnly: true,
   },
   noodle: {
@@ -209,6 +242,7 @@ export const ANIMALS: Record<AnimalId, Animal> = {
       "the conversation.",
     vocabulary: ["Hsss", "Sssss", "HSSSSSS", "*flick flick*", "..."],
     triggers: ["mouse", "rat", "warm", "heat", "sun", "egg", "grab", "shed"],
+    remembers: "Remembers warmth, food, and anyone who has ever held it badly.",
     membersOnly: true,
   },
 };

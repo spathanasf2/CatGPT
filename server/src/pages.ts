@@ -39,7 +39,7 @@ export function privacyHtml(): string {
   return page(
     "Privacy Policy — Aineko",
     `<h1>Privacy Policy</h1>
-<p><small>Last updated: 2026-09-22</small></p>
+<p><small>Last updated: 2026-09-23</small></p>
 <p>Aineko is a simple chat app. This page describes exactly what happens to your data -- nothing
 more is collected than what's listed here.</p>
 <h2>What we collect</h2>
@@ -51,7 +51,8 @@ first time it runs; by each IP address; and, for members, by each subscription, 
 Apple's transaction ID. These counts contain no message content and expire after about a month.</p>
 <h2>What happens to a message you send</h2>
 <p>The app asks for your permission before sending anything. The text you type -- along with the
-last few messages of that conversation, so the animal can follow along -- is sent to our server,
+last few messages of that conversation and the short list of things that animal remembers about
+you, so it can follow along -- is sent to our server,
 which forwards it to <a href="https://openrouter.ai">OpenRouter</a> and an underlying third-party
 AI model to generate a reply. We do not log or store the content of your messages. OpenRouter and
 the model provider handling the request have their own data practices; see <a
@@ -59,8 +60,9 @@ href="https://openrouter.ai/privacy">OpenRouter's privacy policy</a> for how the
 request while processing it. You can review or withdraw your permission any time in the app under
 Settings &rsaquo; AI &amp; privacy.</p>
 <h2>Chat history</h2>
-<p>Your conversations are stored locally on your device only. We have no copy of them and cannot
-see them.</p>
+<p>Your conversations, and the notes each animal keeps about what it remembers, are stored locally on
+your device only. We have no copy of them and cannot see them. You can read or erase the notes any
+time under Settings &rsaquo; What they remember.</p>
 <h2>Payments</h2>
 <p>Subscriptions are handled entirely by Apple's App Store billing (StoreKit). We never see your
 payment details or your Apple ID. To confirm a membership is active, the app sends our server

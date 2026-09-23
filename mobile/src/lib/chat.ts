@@ -5,6 +5,8 @@ import { apiHeaders, serverConfigured, SERVER_URL } from "./api";
 export type AnimalReply = {
   sounds: string;
   narrative: string;
+  // Something this animal decided to hold onto -- stored by lib/memory.ts.
+  remember?: string;
 };
 
 export type HistoryItem =
@@ -55,6 +57,7 @@ export async function askAnimal(
   animal: AnimalId,
   message: string,
   history: HistoryItem[],
+  memory: string[],
   timeoutMs = 25_000,
 ): Promise<AnimalReply> {
   if (!serverConfigured()) throw new ChatError("unavailable", "Aineko server URL or token not configured");
@@ -66,7 +69,7 @@ export async function askAnimal(
       res = await fetch(`${SERVER_URL}/chat`, {
         method: "POST",
         headers: { ...apiHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ animal, message, history }),
+        body: JSON.stringify({ animal, message, history, memory }),
         signal: ctrl.signal,
       });
     } catch (err) {
@@ -74,7 +77,16 @@ export async function askAnimal(
       throw new ChatError("offline", err instanceof Error ? err.message : "network error");
     }
     const body = (await res.json().catch(() => null)) as
-      | { sounds?: unknown; narrative?: unknown; error?: unknown; code?: unknown; tier?: unknown; window?: unknown; resetAt?: unknown }
+      | {
+          sounds?: unknown;
+          narrative?: unknown;
+          remember?: unknown;
+          error?: unknown;
+          code?: unknown;
+          tier?: unknown;
+          window?: unknown;
+          resetAt?: unknown;
+        }
       | null;
     if (!res.ok) {
       const reason = typeof body?.error === "string" ? body.error : `server returned ${res.status}`;
@@ -94,7 +106,9 @@ export async function askAnimal(
     if (!body || typeof body.sounds !== "string" || typeof body.narrative !== "string") {
       throw new ChatError("unavailable", "invalid response from server");
     }
-    return { sounds: body.sounds, narrative: body.narrative };
+    const reply: AnimalReply = { sounds: body.sounds, narrative: body.narrative };
+    if (typeof body.remember === "string" && body.remember.trim()) reply.remember = body.remember.trim();
+    return reply;
   } finally {
     clearTimeout(timer);
   }
