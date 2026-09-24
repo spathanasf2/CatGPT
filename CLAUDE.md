@@ -12,6 +12,44 @@ for `~/qoracle` (see `[[project-mac-workflow]]` in qoracle's memory). Same archi
 qoracle: a static Next.js client wrapped later in Capacitor, plus a tiny server that holds the
 API key so it's never shipped in the client bundle.
 
+## Status -- start here (as of 2026-09-24; thread paused waiting on Apple)
+**Waiting on:** App Review for **1.0 (build 12)**, submitted 2026-09-22. First thing next session:
+ask Frank what Apple said.
+
+**Release queue** (one version in review at a time, per Frank's risk-chunking):
+1. **1.0 (12)** -- in review. Source: tag `1.0-12`. If rejected: `git checkout -b release/1.0
+   1.0-12`, fix, set a new unique `CURRENT_PROJECT_VERSION` (20+), rsync, `npm ci` on the Mac,
+   `ios-build.sh hetzner --upload` (the script postdates build 12 -- copy it into the branch if
+   missing), resubmit, tag. main has moved on to 1.3, so never build a 1.0 fix from main.
+2. **1.1 (16)** -- uploaded, production, light icon. Submit once 1.0 is approved: screenshots
+   `~/deliverables/aineko/app-store-6.5-v1.1/`, review notes mentioning the new bonus roster
+   (Mortimer, Peanut, Tank, Barbara, Noodle), Make your own, and sharing. Source: tag `1.1-16`.
+3. **1.2** -- only a foundry TestFlight build exists (17, tag `1.2-17`). A production build means:
+   `git checkout -b release/1.2 1.2-17`, set a new unique `CURRENT_PROJECT_VERSION` (20+), rsync,
+   `npm ci` on the Mac, `ios-build.sh hetzner --upload`, tag it, back to main. Or skip a separate
+   1.2 and ship 1.3 straight after 1.1 (1.3 contains everything) -- **Frank's call, not yet made.**
+4. **1.3** -- foundry TestFlight 18/19 (tags `1.3-18`, `1.3-19`); main is at 1.3. Production build
+   = bump build number on main, `ios-build.sh hetzner --upload`. Worth adding a room screenshot to
+   the set first (`mobile/scripts/app-store-screenshots/`).
+Once 1.0 is released, App Store Connect closes the 1.0 train: any 1.0 fix needs 1.0.1.
+
+**Production (Hetzner) already runs the newest server** -- characters, memory, custom animals,
+looks, feelings, rooms, promises, localized sounds, language detection, `/get`. All of it is
+opt-in per request, verified backward compatible with 1.0/1.1/1.2/1.3 request shapes. Deploy =
+rsync `server/` (excluding node_modules/dist/.env/usage.json/token-budget.json/test/scripts) to
+`hetzner:services/aineko/` + `docker compose build aineko && docker compose up -d aineko`, with a
+backup first. Monitoring: `aineko-prod-health.timer` on foundry -> Frank's Telegram (see below).
+
+**Frank's side, still open:** App Privacy answers in App Store Connect (install ID = Device ID,
+purchases, user content; he said he'd do it); once the listing is live, set `APP_STORE_URL` in
+Hetzner's compose to the App Analytics campaign link (`...?pt=<provider>&ct=sharecard`) so the
+share link lands on the App Store.
+
+**Decisions on record:** rooms open to free users; custom animals, bonus animals and ~10x
+allowance are the membership; $0.99/month with caps derived from it (`MEMBER_PRICE_USD`);
+foundry builds dark icon / production light; notifications opt-in, day 2/4/7 at 6pm, top 1-2
+animals, promise-first; no "nicker" (kid-safe list).
+
 ## Layout
 - `server/` — Express + TypeScript. Holds the OpenRouter key.
   `POST /chat {animal, message, history?, model?}` -> `{sounds, narrative}` (`history` = the last
