@@ -203,11 +203,13 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
     return;
   }
   const caller = resolveCaller(req);
-  const speaker = legacy ? `the ${character.species}` : character.name;
   if (character.membersOnly && caller.tier !== "member") {
-    res.status(403).json({ error: `${speaker} is a members-only animal`, code: "members-only" });
+    const name = legacy ? `the ${character.species}` : character.name;
+    res.status(403).json({ error: `${name} is a members-only animal`, code: "members-only" });
     return;
   }
+  // How a guard reply names the animal: never a custom name, which may be what was flagged.
+  const speaker = legacy || rawCustom !== undefined ? `the ${character.species}` : character.name;
   // Locked out by the message guard (strikes.ts): answered in character, before anything is spent.
   const lock = activeLock(caller.usageKey);
   if (lock !== null) {
@@ -238,7 +240,6 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
     context: { history, memory, promise, room },
   });
   if (screening.outcome === "unavailable") {
-    log.warn("guard unavailable; chat refused");
     res.status(503).json({ error: "the animal didn't respond (safety check unavailable)" });
     return;
   }

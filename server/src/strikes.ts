@@ -1,8 +1,7 @@
 import { createHash } from "node:crypto";
-import { readFileSync, statSync } from "node:fs";
+import { closeSync, fsyncSync, openSync, readFileSync, renameSync, statSync, writeSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { writeFileAtomic } from "./atomic-write.js";
 import { log } from "./log.js";
 
 // The message guard's memory (2026-10-23): strikes and lockouts per metering key -- `member:`,
@@ -10,19 +9,24 @@ import { log } from "./log.js";
 // foundry's guard-alerts.sh turns into Telegram alerts. Content-blind by design: the privacy policy
 // promises we never store messages, so this holds codes, timestamps and counts, never text.
 //
-// Three enforced strikes in 24 hours lock the key out for 24 hours, then 7 days, then for good;
-// child sexual exploitation locks for good at once. Self-harm is never a strike.
+// Three strikes in 24 hours lock the key out for 24 hours, then 7 days, then for good. A chatroom
+// sends one message once per animal, so strikes closer together than STRIKE_SPACING count once.
+// Self-harm is never a strike; child sexual exploitation is a strike that alerts at once.
 //
 // Lives next to usage.json (the mounted /data volume on Hetzner) unless GUARD_FILE says otherwise.
-// Written atomically on every change -- changes are rare -- and reread when the file changes on
-// disk, so `guard-cli.ts lift` takes effect on a running server.
+// Written (fsynced, then renamed) on every change -- changes are rare -- with the previous good
+// copy kept as .bak, and reread when the file changes on disk, so `guard-cli.ts lift` takes effect
+// on a running server. A file that will not parse is set aside, never overwritten.
 const USAGE_FILE = process.env.USAGE_FILE || fileURLToPath(new URL("../usage.json", import.meta.url));
 const FILE = process.env.GUARD_FILE || join(dirname(USAGE_FILE), "guard.json");
+const BACKUP = `${FILE}.bak`;
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 const STRIKES_TO_LOCK = 3;
+const STRIKE_SPACING = 2 * 60 * 1000;
 const LADDER = [DAY, 7 * DAY]; // then indefinite
+const LADDER_LAPSES_AFTER = 90 * DAY;
 const MAX_EVENTS = 200;
 
 export type Lock = number | "indefinite";
@@ -32,54 +36,96 @@ type CallerState = {
   lockedUntil: Lock | null;
   lockouts: number;
   helpAlertAt?: number;
+  abuseAlertAt?: number;
 };
 
 export type GuardEvent = {
   seq: number;
   at: number;
-  kind: "lockout" | "help";
+  kind: "lockout" | "help" | "abuse";
   tag: string; // anonymized key, see tagFor
   tier: string;
   categories: string[];
   until?: Lock;
-  severe?: boolean;
 };
 
 type State = { seq: number; callers: Record<string, CallerState>; events: GuardEvent[] };
 
-let state: State = { seq: 0, callers: {}, events: [] };
+let state: State = fresh();
 let loadedMtime = -1;
 
 function fresh(): State {
   return { seq: 0, callers: {}, events: [] };
 }
 
+function parse(file: string): State {
+  const parsed = JSON.parse(readFileSync(file, "utf8")) as State;
+  if (typeof parsed !== "object" || parsed === null || typeof parsed.callers !== "object") throw new Error("not guard state");
+  return { seq: parsed.seq ?? 0, callers: parsed.callers ?? {}, events: parsed.events ?? [] };
+}
+
+function errorText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 function reload(): void {
   let mtime: number;
   try {
     mtime = statSync(FILE).mtimeMs;
-  } catch {
-    if (loadedMtime !== -1) state = fresh();
-    loadedMtime = -1;
+  } catch (err) {
+    // Only a missing file means "nothing flagged yet"; anything else keeps what we have.
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+      log.error("guard state not readable; keeping the in-memory copy", { error: errorText(err) });
+    }
     return;
   }
   if (mtime === loadedMtime) return;
   try {
-    const parsed = JSON.parse(readFileSync(FILE, "utf8")) as State;
-    state = { seq: parsed.seq ?? 0, callers: parsed.callers ?? {}, events: parsed.events ?? [] };
+    state = parse(FILE);
     loadedMtime = mtime;
   } catch (err) {
-    // Keep what is in memory; a half-read file must not hand every locked key a fresh start.
-    log.warn("guard state unreadable; keeping the in-memory copy", { error: err instanceof Error ? err.message : String(err) });
+    // Never let an unreadable file free every locked key, and never write over it: set it aside
+    // for a person to look at, and fall back to the last good copy.
+    const aside = `${FILE}.corrupt-${Date.now()}`;
+    try {
+      renameSync(FILE, aside);
+    } catch (renameErr) {
+      // Could not move it: leave it untouched, and keep what is in memory until a person looks.
+      log.error("guard state unreadable and could not be set aside", { error: errorText(err), rename: errorText(renameErr) });
+      loadedMtime = mtime;
+      return;
+    }
+    loadedMtime = -1;
+    try {
+      state = parse(BACKUP);
+      log.error("guard state unreadable; set aside and restored the backup", { aside, error: errorText(err) });
+      save();
+    } catch {
+      log.error("guard state and backup unreadable; set aside, keeping the in-memory copy", { aside, error: errorText(err) });
+    }
   }
+}
+
+function writeDurably(file: string, data: string): void {
+  const tmp = `${file}.tmp`;
+  const fd = openSync(tmp, "w");
+  try {
+    writeSync(fd, data);
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+  renameSync(tmp, file);
 }
 
 function save(): void {
   try {
-    writeFileAtomic(FILE, JSON.stringify(state));
+    const data = JSON.stringify(state);
+    writeDurably(FILE, data);
     loadedMtime = statSync(FILE).mtimeMs;
+    writeDurably(BACKUP, data);
   } catch (err) {
-    log.error("guard state not saved", { error: err instanceof Error ? err.message : String(err) });
+    log.error("guard state not saved", { error: errorText(err) });
   }
 }
 
@@ -98,6 +144,10 @@ function event(fields: Omit<GuardEvent, "seq">): void {
   if (state.events.length > MAX_EVENTS) state.events = state.events.slice(-MAX_EVENTS);
 }
 
+function callerFor(key: string): CallerState {
+  return (state.callers[key] ??= { strikes: [], lockedUntil: null, lockouts: 0 });
+}
+
 /** The lockout in force for this key, or null. */
 export function activeLock(key: string, now = Date.now()): Lock | null {
   reload();
@@ -105,35 +155,41 @@ export function activeLock(key: string, now = Date.now()): Lock | null {
   return isActive(lock, now) ? lock : null;
 }
 
-/** Record an enforced strike; returns the lockout it started, or null when there is none yet. */
-export function recordStrike(key: string, tier: string, categories: string[], severe: boolean, now = Date.now()): Lock | null {
+/** Record a strike; returns the lockout in force afterwards, or null when there is none. */
+export function recordStrike(key: string, tier: string, categories: string[], now = Date.now()): Lock | null {
   reload();
-  const caller = (state.callers[key] ??= { strikes: [], lockedUntil: null, lockouts: 0 });
+  const caller = callerFor(key);
+  // A request that passed the lock check before another one locked the key changes nothing.
+  if (isActive(caller.lockedUntil, now)) return caller.lockedUntil;
   const windowStart = now - DAY;
   caller.strikes = caller.strikes.filter((at) => at >= windowStart);
+  const last = caller.strikes[caller.strikes.length - 1];
+  if (last !== undefined && now - last < STRIKE_SPACING) return null;
   caller.strikes.push(now);
-  if (!severe && caller.strikes.length < STRIKES_TO_LOCK) {
+  if (caller.strikes.length < STRIKES_TO_LOCK) {
     save();
     return null;
   }
   const step = LADDER[caller.lockouts];
-  const until: Lock = severe || step === undefined ? "indefinite" : now + step;
+  const until: Lock = step === undefined ? "indefinite" : now + step;
   caller.lockedUntil = until;
   caller.lockouts += 1;
   caller.strikes = [];
-  event({ at: now, kind: "lockout", tag: tagFor(key), tier, categories, until, ...(severe ? { severe: true } : {}) });
+  event({ at: now, kind: "lockout", tag: tagFor(key), tier, categories, until });
   save();
   log.info("guard lockout", { tag: tagFor(key), tier, categories, until });
   return until;
 }
 
-/** Self-harm: no strike. One alert per key per day at most. */
-export function recordHelp(key: string, tier: string, categories: string[], now = Date.now()): void {
+/** Alert once per key per day: self-harm ("help") or child sexual exploitation ("abuse"). */
+export function recordAlert(kind: "help" | "abuse", key: string, tier: string, categories: string[], now = Date.now()): void {
   reload();
-  const caller = (state.callers[key] ??= { strikes: [], lockedUntil: null, lockouts: 0 });
-  if (caller.helpAlertAt !== undefined && now - caller.helpAlertAt < DAY) return;
-  caller.helpAlertAt = now;
-  event({ at: now, kind: "help", tag: tagFor(key), tier, categories });
+  const caller = callerFor(key);
+  const field = kind === "help" ? "helpAlertAt" : "abuseAlertAt";
+  const previous = caller[field];
+  if (previous !== undefined && now - previous < DAY) return;
+  caller[field] = now;
+  event({ at: now, kind, tag: tagFor(key), tier, categories });
   save();
 }
 
@@ -155,14 +211,19 @@ export function liftByTag(tag: string): number {
   return lifted;
 }
 
-/** Forget keys with nothing left to remember: no live strikes, no lockout, never locked. */
+/**
+ * Forget what no longer matters: keys with no live strikes, lockout or recent alert, and ladders
+ * whose last timed lockout ended 90 days ago. An indefinite lockout is kept.
+ */
 export function pruneStrikes(now = Date.now()): void {
   reload();
   let changed = false;
   for (const [key, caller] of Object.entries(state.callers)) {
     const strikes = caller.strikes.filter((at) => at >= now - DAY);
-    const helpRecent = caller.helpAlertAt !== undefined && now - caller.helpAlertAt < DAY;
-    if (strikes.length === 0 && caller.lockouts === 0 && !isActive(caller.lockedUntil, now) && !helpRecent) {
+    const recentAlert = [caller.helpAlertAt, caller.abuseAlertAt].some((at) => at !== undefined && now - at < DAY);
+    const lapsed = typeof caller.lockedUntil === "number" && caller.lockedUntil < now - LADDER_LAPSES_AFTER;
+    const idle = strikes.length === 0 && !isActive(caller.lockedUntil, now) && !recentAlert;
+    if (idle && (caller.lockouts === 0 || lapsed)) {
       delete state.callers[key];
       changed = true;
     } else if (strikes.length !== caller.strikes.length) {

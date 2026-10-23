@@ -11,4 +11,5 @@ EnvironmentFile=/home/noderunner/aineko/server/.env
 # Message-guard alerts first, and never fatal: they must go out even while health is failing.
 ExecStartPre=-/home/noderunner/aineko/server/scripts/guard-alerts.sh
 ExecStart=/home/noderunner/aineko/server/scripts/prod-health.sh
-TimeoutStartSec=90
+# guard-alerts.sh is bounded at ~90s (ssh 25 + alert 60), prod-health.sh at ~60s.
+TimeoutStartSec=180

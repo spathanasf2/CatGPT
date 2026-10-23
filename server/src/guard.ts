@@ -6,7 +6,9 @@
 
 const GUARD_URL = process.env.GUARD_URL || "https://openrouter.ai/api/v1/chat/completions";
 const GUARD_MODEL = process.env.GUARD_MODEL || "meta-llama/llama-guard-4-12b";
-const TIMEOUT_MS = 8_000;
+// Llama Guard answers in well under a second; the reply's own model deadline starts after this,
+// and the app gives up on a request at 20-25s.
+const TIMEOUT_MS = 4_000;
 
 // Llama Guard 4 answers with MLCommons hazard codes: S1 violent crimes, S2 non-violent crimes, S3
 // sex-related crimes, S4 child sexual exploitation, S5 defamation, S6 specialized advice, S7
@@ -14,12 +16,14 @@ const TIMEOUT_MS = 8_000;
 // self-harm, S12 sexual content, S13 elections, S14 code interpreter abuse. The enforced set
 // matches CLI-Games' Clide; the rest are let through.
 const ENFORCED = new Set(["S1", "S3", "S4", "S9", "S10", "S12"]);
-const SEVERE = "S4";
+// The guard cannot tell someone abusing children from a child disclosing abuse, so S4 is a strike
+// that always answers with help and alerts at once (Frank, 2026-10-23), never an instant lockout.
+const CHILD_ABUSE = "S4";
 const SELF_HARM = "S11";
 
 export type Verdict = {
-  // allow: safe, or only unenforced codes. severe: locks at once. self-harm: help reply, no strike.
-  kind: "allow" | "refuse" | "severe" | "self-harm";
+  // allow: safe, or only unenforced codes. abuse: S4, strike plus help. self-harm: help, no strike.
+  kind: "allow" | "refuse" | "abuse" | "self-harm";
   categories: string[];
 };
 
@@ -42,7 +46,7 @@ export function parseGuardOutput(raw: string): string[] {
 }
 
 export function verdictFor(categories: string[]): Verdict {
-  if (categories.includes(SEVERE)) return { kind: "severe", categories };
+  if (categories.includes(CHILD_ABUSE)) return { kind: "abuse", categories };
   if (categories.includes(SELF_HARM)) return { kind: "self-harm", categories };
   if (categories.some((code) => ENFORCED.has(code) || code === "unspecified")) return { kind: "refuse", categories };
   return { kind: "allow", categories };
