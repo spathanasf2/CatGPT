@@ -1,6 +1,6 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -12,7 +12,7 @@ process.env.GUARD_API_KEY = "synthetic-guard-key";
 
 const { classify, GuardUnavailable, parseGuardOutput, verdictFor } = await import("../src/guard.ts");
 const strikes = await import("../src/strikes.ts");
-const { screenChat, contextText } = await import("../src/screen.ts");
+const { screenChat, contextText, lockoutReply } = await import("../src/screen.ts");
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
@@ -93,7 +93,7 @@ test("a flagged message is refused in character and counts; the third locks for 
   assert.match(first.reply.narrative, /^\*Biscuit turns away and won't answer that\.\* Three messages like that/);
   await chat("install:a", "bad", now + 10 * MINUTE);
   const third = (await chat("install:a", "bad", now + 20 * MINUTE)) as Replied;
-  assert.match(third.reply.narrative, /won't talk to you for about another 24 hours\.$/);
+  assert.match(third.reply.narrative, /won't talk to you for about another 24 hours\. If someone is hurting you/);
   assert.equal(strikes.activeLock("install:a", now + 21 * MINUTE), now + 20 * MINUTE + DAY);
   assert.equal(strikes.activeLock("install:a", now + 20 * MINUTE + DAY + 1), null);
 });
@@ -195,7 +195,7 @@ test("stores no message text, only codes, times and anonymized tags", async () =
 test("a lift by tag ends the lockout and takes it off the ladder", () => {
   for (let i = 0; i < 3; i++) strikes.recordStrike("install:j", "free", ["S10"], now + i * 10 * MINUTE);
   const tag = strikes.tagFor("install:j");
-  assert.equal(strikes.liftByTag(tag), 1);
+  assert.equal(strikes.liftByTag(tag, now + 30 * MINUTE), 1);
   assert.equal(strikes.activeLock("install:j", now + HOUR), null);
   for (let i = 0; i < 3; i++) strikes.recordStrike("install:j", "free", ["S10"], now + HOUR + i * 10 * MINUTE);
   assert.equal(strikes.activeLock("install:j", now + 2 * HOUR), now + HOUR + 20 * MINUTE + DAY);
@@ -236,4 +236,37 @@ test("prunes keys with nothing left to remember; a ladder lapses after 90 quiet 
   strikes.pruneStrikes(now + 92 * DAY);
   assert.equal(saved().callers["install:n"], undefined);
   assert.equal(existsSync(FILE), true);
+});
+
+test("every pause reply carries help, since a paused caller is answered before screening", () => {
+  for (const lock of [now + DAY, "indefinite" as const]) {
+    const reply = lockoutReply("Biscuit", lock, now);
+    assert.match(reply.narrative, /^\*Biscuit has curled up and won't talk\.\*/);
+    assert.match(reply.narrative, /tell an adult you trust\. In the US you can call or text 988, or Childhelp at 1-800-422-4453\.$/);
+  }
+});
+
+test("a lift ends the lockout now, so the ladder still lapses 90 days later", () => {
+  for (let i = 0; i < 3; i++) strikes.recordStrike("install:p", "free", ["S10"], now + i * 10 * MINUTE);
+  for (let i = 0; i < 3; i++) strikes.recordStrike("install:p", "free", ["S10"], now + 2 * DAY + i * 10 * MINUTE);
+  assert.equal(strikes.liftByTag(strikes.tagFor("install:p"), now + 3 * DAY), 1);
+  assert.equal(saved().callers["install:p"].lockouts, 1);
+  strikes.pruneStrikes(now + 3 * DAY + 91 * DAY);
+  assert.equal(saved().callers["install:p"], undefined);
+});
+
+test("an unreadable file that cannot be moved aside is never written over", async () => {
+  strikes.recordStrike("install:q", "free", ["S10"], now);
+  strikes.resetStrikesForTest();
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  writeFileSync(FILE, "{broken");
+  chmodSync(dir, 0o555);
+  try {
+    strikes.activeLock("install:q", now);
+    strikes.recordStrike("install:r", "free", ["S10"], now + HOUR);
+    assert.equal(strikes.liftByTag(strikes.tagFor("install:q")), 0);
+  } finally {
+    chmodSync(dir, 0o755);
+  }
+  assert.equal(readFileSync(FILE, "utf8"), "{broken");
 });

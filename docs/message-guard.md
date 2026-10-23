@@ -52,9 +52,12 @@ key (`tagFor`). The privacy and Acceptable Use pages describe the check and the 
   defaults.
 - `server/src/strikes.ts` holds the ladder and the event list in `guard.json` next to `usage.json`
   (on Hetzner, `~/services/aineko-data/guard.json`), or at `GUARD_FILE`. Every change is fsynced
-  and renamed into place, with the previous good copy kept as `guard.json.bak`. The file is reread
+  and renamed into place, and the same contents are kept as `guard.json.bak`. The file is reread
   when it changes on disk, so a lift needs no restart. A file that will not parse is moved aside
-  to `guard.json.corrupt-<time>` and the backup is loaded; it is never overwritten.
+  to `guard.json.corrupt-<time>` and the backup is loaded. If it cannot be moved, the server stops
+  saving until restarted, so the file is never overwritten.
+- **Every pause reply carries help** (a trusted adult, 988, Childhelp), because a paused caller is
+  answered before anything is screened.
 - `server/src/screen.ts` turns a verdict into a reply, and holds the reply copy.
 - `server/src/guard-cli.ts` is the moderator's tool:
   - `ssh hetzner docker exec aineko node dist/guard-cli.js events` lists recent events.

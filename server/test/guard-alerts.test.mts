@@ -99,3 +99,14 @@ test("never fails, even on garbage", () => {
   writeFileSync(source, "not json");
   assert.match(run(), /state unreadable/);
 });
+
+test("once a baseline exists, a missing file replays nothing", () => {
+  run();
+  state([{ seq: 1, kind: "help", tag: "1234abcd" }]);
+  run();
+  rmSync(source);
+  assert.match(run(), /keeping the baseline at 1/);
+  state([{ seq: 1, kind: "help", tag: "1234abcd" }]);
+  run();
+  assert.equal(alerts().match(/1234abcd/g)?.length, 1);
+});

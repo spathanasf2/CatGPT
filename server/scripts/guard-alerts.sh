@@ -17,8 +17,10 @@ mkdir -p "$STATE_DIR"
 seq_file=$STATE_DIR/guard-seq
 EMPTY='{"seq":0,"events":[]}'
 
-# A missing file on a host that answered means nothing has been flagged yet; that is a baseline of
-# 0, so the very first event is alerted. An empty read means the host did not answer.
+# A missing file on a host that answered means nothing has been flagged yet: on the very first run
+# that is a baseline of 0, so the first event ever is alerted. Once a baseline exists, a missing
+# file changes nothing (a moved or misplaced file must not replay old alerts). An empty read
+# means the host did not answer.
 if [[ -n ${GUARD_SOURCE:-} ]]; then
   json=$(cat "$GUARD_SOURCE" 2>/dev/null || echo "$EMPTY")
 else
@@ -31,6 +33,10 @@ if [[ -z $json ]]; then
 fi
 
 last=$(cat "$seq_file" 2>/dev/null || echo "")
+if [[ $json == "$EMPTY" && -n $last ]]; then
+  echo "guard: no state file on production; keeping the baseline at $last"
+  exit 0
+fi
 out=$(GUARD_JSON=$json LAST_SEQ=$last python3 - <<'PY'
 import json, os, time
 state = json.loads(os.environ["GUARD_JSON"])

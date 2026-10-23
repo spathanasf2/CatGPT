@@ -60,7 +60,8 @@ href="/terms">Acceptable Use policy</a> prohibits. If it flags the message, the 
 answer it, and we keep a count against your device or membership (on the oldest app versions, your
 network address): the kind of content and when, never the words. Strikes are kept for a day, a
 pause's history for 90 days after it ends, and a permanent pause for as long as it lasts. We are
-alerted with an anonymized label and the kind of content, never the words. OpenRouter and
+alerted with an anonymized label and the kind of content, never the words, and keep a log of the
+last 200 such alerts. OpenRouter and
 the model provider handling the request have their own data practices; see <a
 href="https://openrouter.ai/privacy">OpenRouter's privacy policy</a> for how they handle a
 request while processing it. You can review or withdraw your permission any time in the app under
@@ -90,8 +91,8 @@ abuse material, content that facilitates violence or terrorism, or anything else
 applicable law or by our AI provider's usage policies.</p>
 <p>We reserve the right to terminate access for any account or device found violating this policy.
 Messages are checked automatically before an animal answers. Three flagged messages in a day pause
-chats from that device or membership for 24 hours, then 7 days, then for good. Messages are not
-logged (see our <a href="/privacy">Privacy Policy</a>), but requests are relayed
+chats from that device, membership or (on the oldest app versions) network address for 24 hours,
+then 7 days, then for good. Messages are not logged (see our <a href="/privacy">Privacy Policy</a>), but requests are relayed
 through a third-party AI provider that may independently detect and act on prohibited content,
 including reporting where legally required.</p>
 <p>The app is provided "as is," without warranties of any kind. We are not liable for the content

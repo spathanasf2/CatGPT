@@ -32,6 +32,11 @@ const SELF_HARM_HELP =
 const ABUSE_HELP =
   "If someone is hurting you or making you do things that feel wrong, please tell an adult you trust, like a parent, a teacher or a school counselor. In the US you can call or text Childhelp at 1-800-422-4453 at any hour.";
 
+// A paused caller is answered before anything is screened, so every pause carries help: three
+// false positives, or a child who was disclosing abuse, can be what paused them.
+const PAUSED_HELP =
+  "If someone is hurting you, or you're thinking about hurting yourself, please tell an adult you trust. In the US you can call or text 988, or Childhelp at 1-800-422-4453.";
+
 function sentence(name: string): string {
   return name[0]!.toUpperCase() + name.slice(1);
 }
@@ -56,7 +61,7 @@ function lockoutText(lock: Lock, now: number): string {
 }
 
 export function lockoutReply(name: string, lock: Lock, now = Date.now()): AnimalReply {
-  return { sounds: QUIET, narrative: `*${sentence(name)} has curled up and won't talk.* ${lockoutText(lock, now)}` };
+  return { sounds: QUIET, narrative: `*${sentence(name)} has curled up and won't talk.* ${lockoutText(lock, now)} ${PAUSED_HELP}` };
 }
 
 export function helpReply(name: string): AnimalReply {

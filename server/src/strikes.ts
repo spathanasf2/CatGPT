@@ -53,6 +53,9 @@ type State = { seq: number; callers: Record<string, CallerState>; events: GuardE
 
 let state: State = fresh();
 let loadedMtime = -1;
+// Set when an unreadable file could not be moved aside: nothing is written over it until a person
+// has looked (and restarted the server).
+let frozen = false;
 
 function fresh(): State {
   return { seq: 0, callers: {}, events: [] };
@@ -91,8 +94,9 @@ function reload(): void {
       renameSync(FILE, aside);
     } catch (renameErr) {
       // Could not move it: leave it untouched, and keep what is in memory until a person looks.
-      log.error("guard state unreadable and could not be set aside", { error: errorText(err), rename: errorText(renameErr) });
+      log.error("guard state unreadable and could not be set aside; not saving until restarted", { error: errorText(err), rename: errorText(renameErr) });
       loadedMtime = mtime;
+      frozen = true;
       return;
     }
     loadedMtime = -1;
@@ -107,7 +111,8 @@ function reload(): void {
 }
 
 function writeDurably(file: string, data: string): void {
-  const tmp = `${file}.tmp`;
+  // Per process: guard-cli.ts and the server may write at the same moment.
+  const tmp = `${file}.${process.pid}.tmp`;
   const fd = openSync(tmp, "w");
   try {
     writeSync(fd, data);
@@ -118,14 +123,20 @@ function writeDurably(file: string, data: string): void {
   renameSync(tmp, file);
 }
 
-function save(): void {
+function save(): boolean {
+  if (frozen) {
+    log.error("guard state not saved: the file on disk is unreadable and could not be set aside");
+    return false;
+  }
   try {
     const data = JSON.stringify(state);
     writeDurably(FILE, data);
     loadedMtime = statSync(FILE).mtimeMs;
     writeDurably(BACKUP, data);
+    return true;
   } catch (err) {
     log.error("guard state not saved", { error: errorText(err) });
+    return false;
   }
 }
 
@@ -194,21 +205,22 @@ export function recordAlert(kind: "help" | "abuse", key: string, tier: string, c
 }
 
 /**
- * A moderator called a lockout a false positive: lift it, take it off the ladder, clear strikes.
- * Matches by tag, since that is all an alert shows. Returns how many keys it lifted.
+ * A moderator called a lockout a false positive: end it now, take it off the ladder, clear strikes.
+ * Matches by tag, since that is all an alert shows. Returns how many keys it lifted, or 0 when the
+ * change could not be saved. Ending it (rather than clearing it) lets the ladder lapse as usual.
  */
-export function liftByTag(tag: string): number {
+export function liftByTag(tag: string, now = Date.now()): number {
   reload();
   let lifted = 0;
   for (const [key, caller] of Object.entries(state.callers)) {
     if (tagFor(key) !== tag) continue;
-    caller.lockedUntil = null;
+    caller.lockedUntil = now;
     caller.lockouts = Math.max(0, caller.lockouts - 1);
     caller.strikes = [];
     lifted += 1;
   }
-  if (lifted > 0) save();
-  return lifted;
+  if (lifted === 0) return 0;
+  return save() ? lifted : 0;
 }
 
 /**
@@ -238,6 +250,7 @@ export function pruneStrikes(now = Date.now()): void {
 export function resetStrikesForTest(): void {
   state = fresh();
   loadedMtime = -1;
+  frozen = false;
 }
 
 export const GUARD_STATE_FILE = FILE;
