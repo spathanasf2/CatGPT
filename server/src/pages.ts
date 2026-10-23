@@ -39,7 +39,7 @@ export function privacyHtml(): string {
   return page(
     "Privacy Policy — Aineko",
     `<h1>Privacy Policy</h1>
-<p><small>Last updated: 2026-09-23</small></p>
+<p><small>Last updated: 2026-10-23</small></p>
 <p>Aineko is a simple chat app. This page describes exactly what happens to your data -- nothing
 more is collected than what's listed here.</p>
 <h2>What we collect</h2>
@@ -54,7 +54,11 @@ Apple's transaction ID. These counts contain no message content and expire after
 last few messages of that conversation and the short list of things that animal remembers about
 you, so it can follow along -- is sent to our server,
 which forwards it to <a href="https://openrouter.ai">OpenRouter</a> and an underlying third-party
-AI model to generate a reply. We do not log or store the content of your messages. OpenRouter and
+AI model to generate a reply. We do not log or store the content of your messages. Before a reply
+is written, a separate AI model, also through OpenRouter, checks the message for content our <a
+href="/terms">Acceptable Use policy</a> prohibits. If it flags the message, the animal doesn't
+answer it, and we keep a count against your device or membership: the kind of content and when,
+never the words. OpenRouter and
 the model provider handling the request have their own data practices; see <a
 href="https://openrouter.ai/privacy">OpenRouter's privacy policy</a> for how they handle a
 request while processing it. You can review or withdraw your permission any time in the app under
@@ -77,13 +81,15 @@ export function termsHtml(): string {
   return page(
     "Acceptable Use — Aineko",
     `<h1>Acceptable Use</h1>
-<p><small>Last updated: 2026-09-21</small></p>
+<p><small>Last updated: 2026-10-23</small></p>
 <p>Aineko is a novelty chat app for talking to fictional animal personas. By using it, you agree
 not to use it to attempt to generate illegal content, including but not limited to child sexual
 abuse material, content that facilitates violence or terrorism, or anything else prohibited by
 applicable law or by our AI provider's usage policies.</p>
 <p>We reserve the right to terminate access for any account or device found violating this policy.
-Messages are not logged (see our <a href="/privacy">Privacy Policy</a>), but requests are relayed
+Messages are checked automatically before an animal answers. Three flagged messages in a day pause
+chats from that device or membership for 24 hours, then 7 days, then for good; content that
+sexualizes children ends access at once. Messages are not logged (see our <a href="/privacy">Privacy Policy</a>), but requests are relayed
 through a third-party AI provider that may independently detect and act on prohibited content,
 including reporting where legally required.</p>
 <p>The app is provided "as is," without warranties of any kind. We are not liable for the content

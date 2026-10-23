@@ -13,6 +13,8 @@ import { rateLimit } from "./rate-limit.js";
 import { checkBudget, flushBudget, peekBudget } from "./token-budget.js";
 import { verifyMembershipCached } from "./entitlement.js";
 import { FREE_LIMITS, IP_BACKSTOP_LIMITS, LIMITS_SUMMARY, MEMBER_LIMITS, type Limits, type Tier } from "./limits.js";
+import { lockoutReply, screenChat } from "./screen.js";
+import { activeLock, pruneStrikes } from "./strikes.js";
 
 function envStr(name: string): string {
   const v = process.env[name];
@@ -201,9 +203,15 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
     return;
   }
   const caller = resolveCaller(req);
+  const speaker = legacy ? `the ${character.species}` : character.name;
   if (character.membersOnly && caller.tier !== "member") {
-    const name = legacy ? `the ${character.species}` : character.name;
-    res.status(403).json({ error: `${name} is a members-only animal`, code: "members-only" });
+    res.status(403).json({ error: `${speaker} is a members-only animal`, code: "members-only" });
+    return;
+  }
+  // Locked out by the message guard (strikes.ts): answered in character, before anything is spent.
+  const lock = activeLock(caller.usageKey);
+  if (lock !== null) {
+    res.json(lockoutReply(speaker, lock));
     return;
   }
   for (const [key, limits] of caller.checks) {
@@ -219,6 +227,26 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
       return;
     }
   }
+  // The message guard (screen.ts): nothing reaches the animal's model until it has passed. A
+  // refusal, lockout or the self-harm help is the reply; a flagged context is left out.
+  const screening = await screenChat({
+    key: caller.usageKey,
+    tier: caller.tier,
+    speaker,
+    message: message.trim(),
+    customName: rawCustom !== undefined ? character.name : undefined,
+    context: { history, memory, promise, room },
+  });
+  if (screening.outcome === "unavailable") {
+    log.warn("guard unavailable; chat refused");
+    res.status(503).json({ error: "the animal didn't respond (safety check unavailable)" });
+    return;
+  }
+  if (screening.outcome === "reply") {
+    res.json(screening.reply);
+    return;
+  }
+  const keep = !screening.dropContext;
   // `res` "close" also fires after a normal response, so only an unfinished response counts as the
   // client walking away (req "close" is no good here -- it fires once the body has been read).
   const disconnected = new AbortController();
@@ -228,12 +256,12 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
   try {
     const reply = await askAnimal(character, message.trim(), {
       legacy,
-      memory,
+      memory: keep || memory === undefined ? memory : [],
       bond,
-      room,
-      promise,
+      room: keep ? room : undefined,
+      promise: keep || promise === undefined ? promise : null,
       budgetKeys: caller.checks.map(([key]) => key),
-      history,
+      history: keep ? history : [],
       modelOverride: model,
       signal: disconnected.signal,
     });
@@ -247,6 +275,9 @@ app.post("/chat", chatRateLimit, bearerAuth(TOKEN), async (req, res) => {
     res.status(502).json({ error: "the animal didn't respond (upstream error)" });
   }
 });
+
+// Keys the guard has nothing left to remember about (strikes.ts).
+setInterval(() => pruneStrikes(), 60 * 60 * 1000).unref();
 
 const server = app.listen(PORT, () => {
   log.info("listening", { port: PORT, trustProxyHops: TRUST_PROXY_HOPS, limits: LIMITS_SUMMARY });
